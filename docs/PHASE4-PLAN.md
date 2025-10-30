@@ -2,10 +2,10 @@
 
 **Status**: Ready to Execute
 **Approach**: Outside-In TDD (Auth Tests → Implementation)
-**Duration**: 5-6 hours
+**Duration**: 6-7 hours
 **Coverage Target**: >85%
 **Created**: 2025-10-30
-**Version**: 1.0
+**Version**: 1.1 (Updated with security fixes)
 
 ---
 
@@ -52,20 +52,26 @@ Build **JWT-based authentication** to replace temporary query parameter auth fro
 **Expiration**: 24 hours (configurable via env)
 **Storage**: Client-side (Custom GPT context or localStorage for web UI)
 
-**JWT Payload**:
+**JWT Payload** (minimal, secure):
 ```json
 {
   "sub": "user_id_uuid",
-  "email": "user@example.com",
   "exp": 1234567890,
   "iat": 1234567890
 }
 ```
 
+**Security Rationale**:
+- **Only user_id in payload**: JWTs are base64 (not encrypted), anyone can decode them
+- **No email**: If email changes, tokens would have stale data
+- **Minimal size**: Smaller tokens = less network overhead
+- **Immutable data only**: Only include data that won't change during token lifetime
+- **Fetch user data from DB**: Use user_id to get current email/name when needed
+
 **Why This Approach**:
 - Simple: No refresh token complexity yet
 - Stateless: No server-side session storage needed
-- Secure: HS256 with strong secret key
+- Secure: HS256 with strong secret key, minimal payload exposure
 - Scalable: Can add refresh tokens in Phase 5 without breaking changes
 
 ### Password Hashing
@@ -165,7 +171,7 @@ Build **JWT-based authentication** to replace temporary query parameter auth fro
 **`app/auth/service.py`**
 - `AuthService.register_user()` - Create user with hashed password
 - `AuthService.authenticate_user()` - Verify credentials
-- `AuthService.create_access_token()` - Generate JWT
+- `AuthService.get_user_by_email()` - User lookup for authentication
 
 **`app/api/auth.py`**
 - `POST /api/auth/register` - User registration endpoint
@@ -194,7 +200,12 @@ Build **JWT-based authentication** to replace temporary query parameter auth fro
 - Add `JWT_ALGORITHM` setting (default: "HS256")
 - Add `ACCESS_TOKEN_EXPIRE_HOURS` setting (default: 24)
 
+**`app/db/crud.py`**
+- Add `UserCRUD` class with `create()`, `get_by_email()`, `get_by_id()` methods
+- Needed for user registration and authentication
+
 **`app/dependencies.py`**
+- Add `oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")`
 - Update `get_current_user_id()` to validate JWT instead of query param
 - Add `get_current_user()` to return full User object
 
@@ -208,7 +219,7 @@ Build **JWT-based authentication** to replace temporary query parameter auth fro
 
 **`tests/conftest.py`**
 - Add `auth_headers()` fixture - Generate JWT for testing
-- Add `authenticated_user` fixture - User with password for login tests
+- Add `test_user_with_password` fixture - User with known password (avoids circular dependency)
 
 **`pyproject.toml`**
 - Add `passlib[bcrypt]` dependency
@@ -234,16 +245,26 @@ Decodes and validates a JWT access token. Raises `JWTError` if token is invalid,
 
 ---
 
+### `app/db/crud.py` (NEW: UserCRUD)
+
+#### `UserCRUD.create(session: AsyncSession, data: dict) -> User`
+Creates a new user record in database. Accepts dict with email, password_hash, full_name. Commits transaction and returns created User object with ID.
+
+#### `UserCRUD.get_by_email(session: AsyncSession, email: str) -> User | None`
+Finds user by email address. Returns User object if found, None otherwise. Case-sensitive email lookup.
+
+#### `UserCRUD.get_by_id(session: AsyncSession, user_id: UUID) -> User | None`
+Finds user by UUID primary key. Returns User object if found, None otherwise.
+
+---
+
 ### `app/auth/service.py`
 
 #### `AuthService.register_user(session: AsyncSession, email: str, password: str, full_name: str | None = None) -> User`
-Creates a new user account with hashed password. Validates email uniqueness, hashes password with bcrypt, creates user record in database. Raises `ValueError` if email already exists. Returns created User object.
+Creates a new user account with hashed password. Validates email uniqueness via UserCRUD, hashes password with bcrypt, creates user record via UserCRUD. Raises `ValueError` if email already exists. Returns created User object.
 
 #### `AuthService.authenticate_user(session: AsyncSession, email: str, password: str) -> User | None`
-Authenticates user credentials. Finds user by email, verifies password hash. Returns User object if authentication successful, None if email not found or password incorrect.
-
-#### `AuthService.get_user_by_email(session: AsyncSession, email: str) -> User | None`
-Retrieves user by email address. Returns User object if found, None otherwise. Used for duplicate email checking during registration.
+Authenticates user credentials. Finds user by email via UserCRUD, verifies password hash using verify_password(). Returns User object if authentication successful, None if email not found or password incorrect (same response for security).
 
 ---
 
@@ -262,11 +283,21 @@ GET /api/auth/me endpoint (optional). Returns current authenticated user's infor
 
 ### `app/dependencies.py` (Updates)
 
+**Add imports**:
+```python
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+```
+
 #### `get_current_user_id(token: str = Depends(oauth2_scheme)) -> UUID`
-**UPDATED**: Extracts and validates JWT from Authorization header. Decodes token, extracts user_id from `sub` claim. Returns user_id UUID. Raises 401 if token invalid/expired/missing.
+**UPDATED**: Extracts and validates JWT from Authorization header. Decodes token using `decode_access_token()`, extracts user_id from `sub` claim. Returns user_id UUID. Raises HTTPException(401) if token invalid/expired/missing.
 
 #### `get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User`
-**NEW**: Validates JWT and retrieves full User object from database. Uses get_current_user_id internally, then fetches user. Returns User object. Raises 401 if token invalid, 404 if user not found.
+**NEW**: Validates JWT and retrieves full User object from database. Decodes token to get user_id, fetches user via UserCRUD.get_by_id(). Returns User object. Raises HTTPException(401) if token invalid OR if user not found (security: never reveal whether user exists from a valid JWT).
 
 ---
 
@@ -274,8 +305,8 @@ GET /api/auth/me endpoint (optional). Returns current authenticated user's infor
 
 ### `tests/auth/test_security.py` (Unit Tests)
 
-#### `test_hash_password_returns_different_hash_each_time()`
-Same password hashed twice produces different hashes (salt randomness)
+#### `test_hash_password_generates_unique_salt_each_time()`
+Same password hashed twice produces different hashes due to unique salt
 
 #### `test_verify_password_returns_true_for_correct_password()`
 Correct password verifies successfully against its hash
@@ -297,6 +328,9 @@ Expired JWT raises JWTError when decoded
 
 #### `test_decode_access_token_raises_on_invalid_signature()`
 JWT with wrong signature raises JWTError when decoded
+
+#### `test_decode_access_token_validates_expiration_with_clock_skew()`
+Token expiring during request processing handled correctly (edge case)
 
 ---
 
@@ -337,7 +371,7 @@ Registering existing email returns 400 error
 Invalid email format returns 422 validation error
 
 #### `test_register_validates_password_minimum_length()`
-Password shorter than 8 chars returns 422 validation error
+Password shorter than 12 chars returns 422 validation error (NIST 2024 standard)
 
 #### `test_register_does_not_return_password_in_response()`
 Registration response doesn't include password field
@@ -379,8 +413,9 @@ User A's JWT cannot access User B's tasks
 ### Step 1: Setup & Configuration (30 min)
 1. ✅ Add dependencies to `pyproject.toml`
 2. ✅ Update `app/config.py` with JWT settings
-3. ✅ Install dependencies: `make install-dev`
-4. ✅ Verify no breaking changes to existing tests
+3. ✅ Add `UserCRUD` to `app/db/crud.py`
+4. ✅ Install dependencies: `make install-dev`
+5. ✅ Verify no breaking changes to existing tests
 
 ### Step 2: Security Utilities (45 min)
 1. ✅ Create `app/auth/security.py`
@@ -420,21 +455,21 @@ User A's JWT cannot access User B's tasks
 9. ✅ All auth API tests pass
 
 ### Step 6: Update Dependencies (45 min)
-1. ✅ Update `app/dependencies.py`
+1. ✅ Add `oauth2_scheme` to `app/dependencies.py`
 2. ✅ Implement JWT validation in `get_current_user_id()`
-3. ✅ Implement `get_current_user()`
+3. ✅ Implement `get_current_user()` (returns 401 if user not found)
 4. ✅ Update test fixtures in `tests/conftest.py`
 5. ✅ Add `auth_headers()` fixture
-6. ✅ Add `authenticated_user` fixture
+6. ✅ Add `test_user_with_password` fixture (avoids circular dependency)
 
-### Step 7: Migrate Task Endpoints (1 hour)
+### Step 7: Migrate Task Endpoints (1.5 hours)
 1. ✅ Update all endpoints in `app/api/tasks.py`
 2. ✅ Remove `user_id` query parameter
 3. ✅ Use `Depends(get_current_user_id)` instead
 4. ✅ Update ALL tests in `tests/api/test_tasks_api.py`
 5. ✅ Replace `?user_id=` with JWT auth headers
 6. ✅ Run full test suite: `make test`
-7. ✅ All 40+ tests pass (including new auth tests)
+7. ✅ All 55+ tests pass (including new auth tests)
 
 ### Step 8: Final Validation (30 min)
 1. ✅ Run full test suite: `make test`
@@ -447,28 +482,28 @@ User A's JWT cannot access User B's tasks
 
 ---
 
-## Time Budget (Total: 5-6 hours)
+## Time Budget (Total: 6-7 hours)
 
 | Step | Task | Time |
 |------|------|------|
-| 1 | Setup & Configuration | 30 min |
+| 1 | Setup & Configuration (+ UserCRUD) | 30 min |
 | 2 | Security Utilities | 45 min |
 | 3 | Auth Schemas | 20 min |
 | 4 | Auth Service | 1 hour |
 | 5 | Auth API Endpoints | 1.5 hours |
-| 6 | Update Dependencies | 45 min |
-| 7 | Migrate Task Endpoints | 1 hour |
+| 6 | Update Dependencies (+ oauth2_scheme) | 45 min |
+| 7 | Migrate Task Endpoints | 1.5 hours |
 | 8 | Final Validation | 30 min |
-| **TOTAL** | | **6 hours** |
+| **TOTAL** | | **6.5 hours** |
 
-**Buffer**: 30 min for unexpected issues
+**Buffer**: 30 min for unexpected issues (total: 7 hours)
 
 ---
 
 ## Success Criteria Checklist
 
 - [ ] All 15+ auth tests pass
-- [ ] All 40+ existing tests still pass
+- [ ] All 40+ existing tests still pass (55+ total)
 - [ ] >85% code coverage maintained
 - [ ] Can register new user via API
 - [ ] Registration hashes passwords (never plaintext)
@@ -511,22 +546,26 @@ dependencies = [
 - ✅ Automatic salt per password (bcrypt handles this)
 - ✅ No password in API responses
 - ✅ Constant-time password verification (timing attack protection)
+- ✅ Minimum 12 characters (NIST 2024 standard, not outdated 8 chars)
+- ✅ No maximum length (allow passphrases up to 128 chars)
 
 ### JWT Tokens
 - ✅ Use strong secret key (32+ random bytes, from environment)
 - ✅ Include expiration time (24 hours default)
 - ✅ Validate signature on every request
 - ✅ Check expiration on every request
-- ✅ Store minimal data in payload (user_id only)
+- ✅ **Minimal payload**: Only user_id in `sub` claim (no email, no PII)
+- ✅ JWTs are base64 (not encrypted) - anyone can decode them
 - ✅ Use HTTPS in production (prevents token interception)
 
 ### API Endpoints
 - ✅ Validate all inputs with Pydantic
 - ✅ Email format validation
-- ✅ Password minimum length (8 chars)
+- ✅ Password minimum length (12 chars, NIST 2024)
 - ✅ Return generic "invalid credentials" message (don't reveal which field is wrong)
-- ✅ HTTP 401 for auth failures (not 403 or 404)
+- ✅ HTTP 401 for all auth failures (not 403 or 404)
 - ✅ No user enumeration (same response for "email not found" and "wrong password")
+- ✅ Return 401 if user deleted (never reveal user existence from valid JWT)
 
 ### Future Enhancements (Phase 5)
 - Rate limiting on login endpoint (prevent brute force)
@@ -535,6 +574,28 @@ dependencies = [
 - Email verification before account activation
 - Password reset via email
 - Refresh tokens (extend sessions without re-login)
+
+### Known Limitations (Phase 4)
+
+**Token Lifecycle**:
+- ⚠️ **No logout mechanism**: Tokens remain valid until 24hr expiration
+- ⚠️ **Password change doesn't invalidate tokens**: Old tokens work until expiration
+- ⚠️ **Can't revoke compromised tokens**: No server-side token blacklist yet
+
+**Why these limitations**:
+- Phase 4 focuses on stateless JWT authentication (no server-side session storage)
+- Token blacklist requires Redis/database + adds complexity
+- 24hr expiration limits exposure window
+
+**Mitigation**:
+- Short token lifetime (24hrs) limits damage window
+- Phase 5 will add refresh tokens + token blacklist
+- Users can change password to invalidate future logins (existing tokens expire naturally)
+
+**Workaround for compromised tokens**:
+1. User changes password
+2. Wait 24 hours for old tokens to expire
+3. Future: Phase 5 adds immediate revocation
 
 ---
 
