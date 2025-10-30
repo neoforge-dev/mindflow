@@ -127,8 +127,41 @@ async def test_client(db_engine):
 
 
 @pytest_asyncio.fixture
-async def authenticated_client(test_client, test_user):
-    """Client with user_id stored for convenience."""
-    # Store user_id - tests must include ?user_id={client.user_id} in URLs
-    test_client.user_id = test_user.id
+async def test_user_with_password(db_session):
+    """Create test user with known password for authentication."""
+    from app.auth.security import hash_password
+
+    user = User(
+        id=uuid.uuid4(),
+        email="testauth@example.com",
+        password_hash=hash_password("testPassword123"),
+        full_name="Test Auth User",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    # Store plain password for testing
+    user.plain_password = "testPassword123"
+    return user
+
+
+@pytest_asyncio.fixture
+async def auth_headers(test_client, test_user_with_password):
+    """Generate JWT auth headers for testing."""
+    from app.auth.security import create_access_token
+
+    # Create JWT token with user_id
+    token = create_access_token(data={"sub": str(test_user_with_password.id)})
+
+    # Return headers dict
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def authenticated_client(test_client, test_user_with_password, auth_headers):
+    """Client with JWT auth headers for convenience."""
+    # Store auth headers and user for tests
+    test_client.headers.update(auth_headers)
+    test_client.user_id = test_user_with_password.id
+    test_client.user = test_user_with_password
     return test_client

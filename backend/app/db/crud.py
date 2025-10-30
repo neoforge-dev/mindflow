@@ -1,4 +1,4 @@
-"""CRUD operations for tasks with transaction management."""
+"""CRUD operations for tasks and users with transaction management."""
 
 import uuid
 from datetime import datetime
@@ -8,7 +8,36 @@ from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from .models import Task
+from .models import Task, User
+
+
+class UserCRUD:
+    """User database operations for authentication."""
+
+    @staticmethod
+    async def create(session: AsyncSession, data: dict[str, Any]) -> User:
+        """Create new user with transaction handling."""
+        try:
+            user = User(**data)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            return user
+        except Exception:
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_by_email(session: AsyncSession, email: str) -> User | None:
+        """Find user by email address (case-sensitive)."""
+        result = await session.execute(select(User).where(User.email == email))
+        return result.scalars().first()
+
+    @staticmethod
+    async def get_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | None:
+        """Find user by UUID primary key."""
+        result = await session.execute(select(User).where(User.id == user_id))
+        return result.scalars().first()
 
 
 class TaskCRUD:
