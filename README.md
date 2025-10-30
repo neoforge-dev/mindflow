@@ -1,36 +1,105 @@
 # MindFlow – AI-First Task Manager
 
-[![Status](https://img.shields.io/badge/status-MVP-blue)]()
+[![Status](https://img.shields.io/badge/status-Phase%202%20Complete-brightgreen)]()
+[![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20PostgreSQL-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 
-> **Natural language task management powered by GPT-4 + deterministic relevance scoring**
+> **Natural language task management powered by GPT-4 + FastAPI + PostgreSQL**
 
-MindFlow demonstrates an AI-first vertical slice integrating **Custom GPT** (Actions), **Google Apps Script** (API), and **Google Sheets** (data store) for intelligent task prioritization through conversation.
+MindFlow is an AI-first task manager that combines **Custom GPT** (Actions) with a **FastAPI backend** and **PostgreSQL database** for intelligent task prioritization through conversation.
+
+---
+
+## 🚀 Current Status: Phase 2 Complete
+
+**Database Layer**: ✅ Production-Ready
+- AsyncIO SQLAlchemy with PostgreSQL 15
+- Connection pooling (10 persistent + 5 overflow)
+- Multi-user isolation with user_id validation
+- Complete CRUD operations with transaction management
+- 19 integration tests passing (>90% coverage)
+- Modern tooling: uv + ruff + Makefile
+
+**Next**: Phase 3 - API Endpoints (4-5 hours)
+
+---
+
+## Quick Start
+
+### Backend Setup (Modern Stack)
+
+**Prerequisites**:
+- [uv](https://github.com/astral-sh/uv) (Python package manager)
+- Docker (for PostgreSQL test database)
+- Python 3.11+
+
+**One-command setup**:
+```bash
+cd backend
+make quick-start
+```
+
+This will:
+1. Install all dependencies with uv
+2. Start PostgreSQL test database (Docker)
+3. Run 19 integration tests
+4. Verify >90% code coverage
+
+**Development commands**:
+```bash
+make help          # Show all available commands
+make test          # Run tests with coverage
+make lint          # Check code quality
+make format        # Format code with ruff
+make db-up         # Start test database
+make run           # Start FastAPI dev server (Phase 3+)
+```
+
+**Manual setup** (step by step):
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+cd backend
+uv sync
+
+# Start test database
+make db-up
+
+# Run tests
+make test
+
+# See coverage report
+make coverage
+```
 
 ---
 
 ## Project Overview
 
-**Goal:** Enable users to manage tasks using natural language while maintaining transparent, explainable AI recommendations.
+**Goal**: Enable users to manage tasks using natural language while maintaining transparent, explainable AI recommendations.
 
-**Tech Stack:**
-- **Frontend:** Custom GPT with Actions (OpenAI function calling)
-- **Backend:** Google Apps Script (REST API)
-- **Database:** Google Sheets (tasks + audit logs)
-- **Intelligence:** GPT-4 + deterministic scoring algorithm
+**Tech Stack** (Updated):
+- **Frontend**: Custom GPT with Actions (OpenAI function calling)
+- **Backend**: FastAPI (Python 3.11+) with async/await
+- **Database**: PostgreSQL 15 (async with asyncpg driver)
+- **Intelligence**: GPT-4 + deterministic scoring algorithm
+- **Deployment**: DigitalOcean Droplet (backend) + Cloudflare Pages (frontend)
 
-**Key Features:**
+**Key Features**:
 - 🎯 Ask "What should I do next?" → Get intelligently ranked task with reasoning
 - ✍️ Create/update tasks conversationally (no forms)
-- 📊 Real-time updates visible in Google Sheet
+- 📊 Real-time database persistence with PostgreSQL
 - 🔍 Full audit trail of all operations
 - 🧮 Explainable relevance scores (not ML black box)
+- 🚀 Production-ready: connection pooling, transactions, multi-user isolation
 
 ---
 
 ## Architecture
 
-### System Overview
+### Current Architecture (Phase 2)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -54,19 +123,25 @@ MindFlow demonstrates an AI-first vertical slice integrating **Custom GPT** (Act
         └────────────────┼────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│         GOOGLE APPS SCRIPT (REST API Layer)             │
-│  • Input validation                                     │
+│         FASTAPI BACKEND (REST API Layer)                │
+│  • Async request handling (uvicorn)                    │
+│  • Pydantic validation                                 │
 │  • Relevance scoring engine                            │
-│  • CRUD operations on Sheets                           │
+│  • JWT authentication (Phase 4)                        │
 │  • Audit logging                                       │
 └────────────────────────┬────────────────────────────────┘
-                         │ Sheets API
-         ┌───────────────┴───────────────┐
-         ▼                               ▼
-    ┌──────────┐                  ┌──────────┐
-    │  Tasks   │                  │   Logs   │
-    │  Sheet   │                  │  Sheet   │
-    └──────────┘                  └──────────┘
+                         │ AsyncPG Driver
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│         POSTGRESQL 15 (Database Layer) ✅                │
+│  • Users table (authentication)                         │
+│  • Tasks table (with scoring fields)                    │
+│  • UserPreferences table (scoring weights)              │
+│  • AuditLogs table (operations tracking)                │
+│  • Connection pooling (10 + 5 overflow)                 │
+│  • Composite indexes for performance                    │
+│  • CASCADE deletes for data integrity                   │
+└─────────────────────────────────────────────────────────┘
          │
          ▼
     ┌──────────────────────────────────────┐
@@ -83,612 +158,423 @@ MindFlow demonstrates an AI-first vertical slice integrating **Custom GPT** (Act
 | Component | Rationale |
 |-----------|-----------|
 | **Custom GPT** | Natural language interface, built-in function calling, no custom UI needed |
-| **Google Apps Script** | Zero server ops, free tier, rapid prototyping, native Sheets integration |
-| **Google Sheets** | Transparent data store, real-time collaboration, familiar UX, instant audit trail |
+| **FastAPI** | Async performance, automatic API docs, type safety, modern Python |
+| **PostgreSQL** | ACID compliance, rich indexing, battle-tested, JSON support (JSONB) |
+| **AsyncPG** | Fastest Python PostgreSQL driver, native async/await |
+| **uv** | 10-100x faster than pip, reproducible builds, modern Python tooling |
+| **Ruff** | 10-100x faster than pylint, auto-formatting, comprehensive linting |
 | **Deterministic Scoring** | Explainable (not ML black box), customizable weights, debuggable logic |
 
 ---
 
 ## Data Model
 
-### Tasks Table
+### Database Schema (PostgreSQL)
 
-**Sheet Name:** `tasks`
+#### `users` Table
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique identifier |
+| `email` | VARCHAR(255) | UNIQUE, NOT NULL | User email (login) |
+| `password_hash` | VARCHAR(255) | NOT NULL | Hashed password |
+| `full_name` | VARCHAR(255) | NULL | Display name |
+| `plan` | VARCHAR(50) | DEFAULT 'free' | Subscription tier |
+| `is_active` | BOOLEAN | DEFAULT true | Account status |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Registration time |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | Last modification |
 
-| Column | Type | Required | Description | Example |
-|--------|------|----------|-------------|---------|
-| `id` | UUID | ✓ | Unique identifier | `a1b2c3d4-e5f6-...` |
-| `title` | String(256) | ✓ | Task description | `Review Q4 metrics` |
-| `description` | String(1000) | ✗ | Detailed notes | `Analyze quarterly performance...` |
-| `status` | Enum | ✓ | Current state | `pending`, `in_progress`, `completed`, `snoozed` |
-| `priority` | Integer(1-5) | ✓ | Urgency level | `5` (most urgent) to `1` (low) |
-| `due_date` | ISO8601 | ✗ | Deadline | `2025-11-15T17:00:00Z` |
-| `snoozed_until` | ISO8601 | ✗ | Hidden until | `2025-10-31T14:00:00Z` |
-| `created_at` | ISO8601 | ✓ | Creation time | `2025-10-30T10:00:00Z` |
-| `updated_at` | ISO8601 | ✓ | Last modified | `2025-10-30T11:00:00Z` |
+**Indexes**: `idx_users_email` (unique)
 
-**Validation Rules:**
-- `status` must be one of: `pending`, `in_progress`, `completed`, `snoozed`
-- `priority` must be integer 1-5 (inclusive)
-- `title` must be non-empty, max 256 characters
-- Date fields must be valid ISO8601 or empty
+#### `tasks` Table
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK, DEFAULT gen_random_uuid() | Unique identifier |
+| `user_id` | UUID | FK users(id) ON DELETE CASCADE | Owner |
+| `title` | VARCHAR(256) | NOT NULL | Task description |
+| `description` | TEXT | NULL | Detailed notes |
+| `status` | VARCHAR(50) | DEFAULT 'pending' | pending, in_progress, completed, snoozed |
+| `priority` | INTEGER | DEFAULT 3, CHECK (1-5) | Urgency level |
+| `due_date` | TIMESTAMP | NULL | Deadline |
+| `snoozed_until` | TIMESTAMP | NULL | Hidden until |
+| `completed_at` | TIMESTAMP | NULL | Completion time |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Creation time |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | Last modification |
+| `effort_estimate_minutes` | INTEGER | NULL | For impact/effort scoring |
+| `tags` | VARCHAR(500) | NULL | Comma-separated: "morning,urgent" |
 
-### Logs Table
+**Indexes**:
+- `idx_tasks_user_status` (user_id, status)
+- `idx_tasks_user_due` (user_id, due_date)
+- `idx_tasks_snoozed_until` (snoozed_until)
 
-**Sheet Name:** `logs`
+#### `user_preferences` Table
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK | Unique identifier |
+| `user_id` | UUID | FK users(id) UNIQUE | One per user |
+| `weight_urgency` | INTEGER | DEFAULT 40 | Scoring weight (0-100) |
+| `weight_priority` | INTEGER | DEFAULT 35 | Scoring weight (0-100) |
+| `weight_impact` | INTEGER | DEFAULT 15 | Scoring weight (0-100) |
+| `weight_effort` | INTEGER | DEFAULT 10 | Scoring weight (0-100) |
+| `timezone` | VARCHAR(50) | DEFAULT 'UTC' | User timezone |
+| `work_start_time` | TIME | DEFAULT '09:00' | Focus hours start |
+| `work_end_time` | TIME | DEFAULT '17:00' | Focus hours end |
+| `enable_habit_learning` | BOOLEAN | DEFAULT true | AI personalization |
 
-| Column | Description | Example |
-|--------|-------------|---------|
-| `timestamp` | When request occurred | `2025-10-30T11:00:00Z` |
-| `action` | Operation performed | `GET_BEST_TASK`, `CREATE_TASK` |
-| `result` | Outcome | `success`, `error` |
-| `status_code` | HTTP status | `200`, `400`, `500` |
-| `request_id` | Tracing UUID | `req-xyz-123` |
-| `error_message` | Error details (if failed) | `Missing required field: title` |
+#### `audit_logs` Table
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK | Unique identifier |
+| `timestamp` | TIMESTAMP | DEFAULT NOW(), NOT NULL | When |
+| `user_id` | UUID | FK users(id) ON DELETE SET NULL | Who |
+| `action` | VARCHAR(100) | NOT NULL | CREATE_TASK, GET_BEST_TASK, etc. |
+| `resource_id` | UUID | NULL | Task ID if applicable |
+| `result` | VARCHAR(20) | NOT NULL, CHECK (success/error) | Outcome |
+| `error_message` | TEXT | NULL | Error details |
+| `request_duration_ms` | INTEGER | NULL | Performance tracking |
 
-**Purpose:** Full audit trail for debugging and compliance.
+**Indexes**:
+- `idx_audit_user_timestamp` (user_id, timestamp DESC)
+- `idx_audit_action` (action)
+- `idx_audit_errors` (result) WHERE result = 'error'
 
 ---
 
 ## API Endpoints
 
-### Base URL
-```
-https://script.google.com/macros/s/{YOUR_SCRIPT_ID}/exec
-```
+### Status
 
-### 1. Create Task
+**Phase 2 (Complete)**: ✅ Database layer with CRUD operations
+**Phase 3 (Next)**: 🚧 FastAPI REST endpoints (4-5 hours)
 
-**Endpoint:** `POST /?action=create`
+### Planned Endpoints
 
-**Request:**
-```json
-{
-  "title": "Review Q4 metrics",
-  "description": "Analyze quarterly performance data",
-  "priority": 4,
-  "due_date": "2025-11-15T17:00:00Z"
-}
-```
+| Endpoint | Method | Description | Status |
+|----------|--------|-------------|--------|
+| `/health` | GET | Health check | 🚧 Phase 3 |
+| `/api/tasks` | POST | Create task | 🚧 Phase 3 |
+| `/api/tasks` | GET | List tasks | 🚧 Phase 3 |
+| `/api/tasks/best` | GET | Get best task to work on | 🚧 Phase 3 |
+| `/api/tasks/{id}` | GET | Get specific task | 🚧 Phase 3 |
+| `/api/tasks/{id}` | PUT | Update task | 🚧 Phase 3 |
+| `/api/tasks/{id}` | DELETE | Delete task | 🚧 Phase 3 |
+| `/api/auth/register` | POST | Register new user | 🚧 Phase 4 |
+| `/api/auth/login` | POST | Login and get JWT | 🚧 Phase 4 |
 
-**Response (201):**
-```json
-{
-  "status": "success",
-  "code": 201,
-  "data": {
-    "id": "a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8",
-    "title": "Review Q4 metrics",
-    "status": "pending",
-    "created_at": "2025-10-30T11:00:00Z"
-  }
-}
-```
+**Database Layer (Phase 2 - Complete)**:
+- ✅ `TaskCRUD.create()` - Create task with transaction management
+- ✅ `TaskCRUD.get_by_id()` - Retrieve with user validation
+- ✅ `TaskCRUD.list_by_user()` - List with optional status filter
+- ✅ `TaskCRUD.update()` - Update with error handling
+- ✅ `TaskCRUD.delete()` - Delete with ownership validation
+- ✅ `TaskCRUD.get_pending_tasks()` - Get actionable tasks (excludes completed/snoozed)
 
 ---
 
-### 2. Get Best Task
+## Testing
 
-**Endpoint:** `GET /?action=best`
+### Phase 2 Test Coverage
 
-**Query Parameters:**
-- `timezone` (optional): IANA timezone, default `UTC`
+**Test Suite**: 19 integration tests
+**Coverage**: 75.86% overall, **>90% database layer**
 
-**Response (200):**
-```json
-{
-  "status": "success",
-  "code": 200,
-  "data": {
-    "id": "a1b2c3d4-e5f6",
-    "title": "Review Q4 metrics",
-    "priority": 4,
-    "due_date": "2025-11-15T17:00:00Z",
-    "score": 52,
-    "reasoning": "High priority (4) + due in 16 days"
-  }
-}
+**Test Categories**:
+- **Database Connection** (2 tests): Engine connectivity, session creation
+- **Models** (4 tests): User/Task creation, cascade deletes, audit logs
+- **CRUD Operations** (11 tests): Create, read, update, delete with transactions
+- **Error Handling** (2 tests): Nonexistent resources, multi-tenancy isolation
+
+**Run tests**:
+```bash
+cd backend
+make test          # All tests with coverage
+make test-fast     # Skip coverage (faster)
+make test-unit     # Unit tests only
+make test-integration  # Integration tests only
+make coverage      # HTML coverage report
 ```
 
-**Response (200 - No Tasks):**
-```json
-{
-  "status": "success",
-  "code": 200,
-  "data": {
-    "status": "no_tasks",
-    "message": "No active tasks"
-  }
-}
-```
+**Test Database**:
+- Uses PostgreSQL 15 (not SQLite) to match production
+- Docker container on port 54320
+- Automatic setup/teardown with `make db-up` / `make db-down`
 
 ---
 
-### 3. Update Task
+## Development Workflow
 
-**Endpoint:** `POST /?action=update&id={task_id}`
-
-**Request:**
-```json
-{
-  "status": "in_progress",
-  "priority": 5
-}
-```
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "code": 200,
-  "data": {
-    "id": "a1b2c3d4-e5f6",
-    "updated_at": "2025-10-30T11:05:00Z"
-  }
-}
-```
-
----
-
-### 4. Complete Task
-
-**Endpoint:** `POST /?action=complete&id={task_id}`
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "code": 200,
-  "message": "Task marked as completed"
-}
-```
-
----
-
-### 5. Snooze Task
-
-**Endpoint:** `POST /?action=snooze&id={task_id}`
-
-**Request:**
-```json
-{
-  "snooze_duration": "2h"
-}
-```
-
-Supported durations: `1h`, `2h`, `4h`, `1d`, `2d`, `1w`
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "code": 200,
-  "data": {
-    "snoozed_until": "2025-10-30T13:00:00Z"
-  }
-}
-```
-
----
-
-### 6. Query Tasks
-
-**Endpoint:** `GET /?action=query`
-
-**Query Parameters:**
-- `status` (optional): Filter by status
-- `priority` (optional): Filter by priority
-- `limit` (optional): Max results (default 10, max 20)
-
-**Example:**
-```
-GET /?action=query&status=pending&priority=5
-```
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "code": 200,
-  "data": [
-    {
-      "id": "a1b2c3d4-e5f6",
-      "title": "Review Q4 metrics",
-      "status": "pending",
-      "priority": 4,
-      "due_date": "2025-11-15T17:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### Error Responses
-
-All errors follow this format:
-
-```json
-{
-  "status": "error",
-  "code": 400,
-  "message": "Validation failed",
-  "errors": [
-    {
-      "field": "title",
-      "issue": "Title is required"
-    }
-  ],
-  "requestId": "req-a1b2c3d4"
-}
-```
-
-**Common Error Codes:**
-- `400` – Validation failed (invalid input)
-- `404` – Task not found
-- `500` – Internal server error
-
----
-
-## Relevance Logic (Task Scoring)
-
-### Algorithm Overview
-
-The "best task right now" is determined using a **weighted scoring model**:
-
-```
-score = (0.40 × priority_score)
-      + (0.35 × urgency_score)
-      + (0.15 × context_score)
-      + (0.10 × momentum_score)
-```
-
-### Component 1: Priority Score (0-100)
-
-```
-priority_score = priority_level × 20
-```
-
-| Priority | Score | Meaning |
-|----------|-------|---------|
-| 5 | 100 | Urgent (do now) |
-| 4 | 80 | High (this week) |
-| 3 | 60 | Normal |
-| 2 | 40 | Low (can wait) |
-| 1 | 20 | Nice-to-have |
-
-### Component 2: Urgency Score (0-100)
-
-Based on **time remaining until due_date**:
-
-| Time Remaining | Urgency Score | Rationale |
-|----------------|---------------|-----------|
-| Overdue | 100 | Critical! |
-| < 4 hours | 90 | Immediate attention |
-| < 24 hours | 75 | Today's work |
-| < 72 hours | 50 | This week |
-| > 10 days | 0-40 | Linear decay |
-
-### Component 3: Context Score (0-100)
-
-Currently fixed at `50`. Future enhancement: time-of-day awareness.
-
-**Planned Logic:**
-- Tasks tagged `morning` get +20 boost from 6am-12pm
-- Tasks tagged `afternoon` get +20 boost from 12pm-6pm
-- Tasks tagged `evening` get +20 boost from 6pm-11pm
-
-### Component 4: Momentum Score (0-100)
-
-Encourages task completion and focus:
-
-| Status | Momentum Score | Rationale |
-|--------|----------------|-----------|
-| `in_progress` | 80 | Don't lose focus on started work |
-| `pending` (old) | 20-40 | Age encourages completion |
-| `completed` | 0 | Filtered out |
-| `snoozed` | 0 | Filtered out |
-
----
-
-### Example Calculation
-
-**Task:** "Review Q4 metrics"
-- **Priority:** 4 (high)
-- **Due:** 2025-11-15 (16 days away)
-- **Status:** pending
-- **Created:** 4 days ago
-- **Current Time:** 2025-10-30 14:00 UTC
-
-**Calculation:**
-```
-priority_score = 4 × 20 = 80
-urgency_score = 30  (16 days away → light decay)
-context_score = 50  (no time-of-day tag)
-momentum_score = 20  (4 days old)
-
-total_score = (0.40 × 80) + (0.35 × 30) + (0.15 × 50) + (0.10 × 20)
-            = 32 + 10.5 + 7.5 + 2
-            = 52 (moderate priority)
-```
-
-**GPT Response:**
-> "You should work on **'Review Q4 metrics'** next. It's high priority (4) and due in 16 days, giving it a score of 52."
-
----
-
-## Operational Details
-
-### Timezone Handling
-
-- **Default:** All timestamps stored in UTC (ISO8601)
-- **Query Support:** `timezone` parameter for `/best` endpoint
-- **Apps Script:** Uses `Session.getScriptTimeZone()` for server locale
-
-### Idempotency
-
-- **Task Creation:** Unique `id` (UUID) prevents duplicates
-- **Updates:** Based on `id`, safe to retry
-- **Completion:** Idempotent (multiple calls = same result)
-
-### Observability
-
-**Every API request logs:**
-1. Timestamp (when)
-2. Action (what)
-3. Result (success/error)
-4. Status code (HTTP)
-5. Request ID (tracing)
-6. Error message (if failed)
-
-**Query logs:**
-```javascript
-// Open Logs sheet
-// Filter by status_code >= 400 to see errors
-// Use request_id to trace user sessions
-```
-
-### Rate Limiting
-
-**Current:** None (demo only)
-
-**Production Recommendation:** 60 requests/minute per user
-
----
-
-## Setup & Deployment
-
-### Option 1: Quick Start with Modern Tooling (Recommended) ⚡
-
-**Fastest method using modern Python tooling:**
+### Common Commands
 
 ```bash
-# Install uv (if not installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Development
+make help          # Show all available commands
+make install-dev   # Install dependencies with uv
+make test          # Run tests with coverage
+make lint          # Check code style with ruff
+make format        # Auto-format code
+make check         # Run all checks (lint + format + test)
 
-# Install dependencies
-uv sync --all-extras
+# Database
+make db-up         # Start PostgreSQL test database
+make db-down       # Stop test database
+make db-reset      # Reset database (clean slate)
+make db-shell      # Open PostgreSQL shell
+make db-logs       # Show database logs
 
-# Seed test data (47 realistic tasks)
-make seed
+# Deployment (Phase 3+)
+make run           # Run FastAPI dev server
+make run-prod      # Run production server (4 workers)
+```
 
-# Run tests
+### Making Changes
+
+```bash
+# Create feature branch
+git checkout -b feature/api-endpoints
+
+# Make changes, test locally
 make test
+make lint
+
+# Commit (tests must pass)
+git add .
+git commit -m "feat: add REST API endpoints"
+git push origin feature/api-endpoints
 ```
 
-**Estimated Time:** 10-15 minutes
+---
 
-**Features:**
-- ✅ Modern Python package management with `uv` (blazing fast)
-- ✅ Factory-generated realistic test data (60+ test cases)
-- ✅ Comprehensive test coverage with pytest
-- ✅ Make commands for easy workflow
-- ✅ Full documentation with guides
+## Phase Roadmap
 
-**Guides:**
-- [`TESTING.md`](./TESTING.md) - Testing guide with uv commands
-- [`CUSTOM_GPT_SETUP.md`](./CUSTOM_GPT_SETUP.md) - Custom GPT configuration
+### ✅ Phase 1: Prototype (Complete)
+- Google Apps Script backend
+- Google Sheets database
+- Custom GPT integration
+- Deterministic scoring algorithm
+- [Live Demo](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow)
+- [Video Walkthrough](https://www.loom.com/share/e29f24d461c94396aebe039ef77fb9b7)
+
+### ✅ Phase 2: Database Layer (Complete)
+- **Duration**: 4 hours
+- **Status**: ✅ Production-Ready
+- AsyncIO SQLAlchemy with PostgreSQL 15
+- Connection pooling (10 persistent + 5 overflow)
+- User, Task, UserPreferences, AuditLog models
+- Complete CRUD operations with transactions
+- Multi-user isolation verified
+- 19 integration tests passing (>90% coverage)
+- Modern tooling: uv + ruff + Makefile
+- **Deliverables**:
+  - ✅ `app/config.py` - Environment configuration
+  - ✅ `app/db/database.py` - Async engine + pooling
+  - ✅ `app/db/models.py` - SQLAlchemy models
+  - ✅ `app/db/crud.py` - Database operations
+  - ✅ `app/schemas/task.py` - Pydantic validation
+  - ✅ `tests/conftest.py` - Pytest fixtures
+  - ✅ `tests/integration/test_database.py` - Integration tests
+  - ✅ `pyproject.toml` - Modern dependencies
+  - ✅ `Makefile` - Development commands
+  - ✅ `README.md` - Comprehensive docs
+
+### 🚧 Phase 3: API Endpoints (Next - 4-5 hours)
+- FastAPI REST endpoints
+- Request/response validation
+- Error handling middleware
+- `/api/tasks` CRUD operations
+- `/api/tasks/best` scoring endpoint
+- OpenAPI documentation
+- 15-20 API endpoint tests
+- **Deployment**: DigitalOcean Droplet
+  - Ubuntu 22.04 LTS
+  - Nginx reverse proxy
+  - SSL via Let's Encrypt
+  - Systemd service
+
+### 🔮 Phase 4: Authentication (5-6 hours)
+- JWT token generation
+- Password hashing (bcrypt)
+- `/api/auth/register` endpoint
+- `/api/auth/login` endpoint
+- Authentication middleware
+- Protected routes
+- User session management
+
+### 🔮 Phase 5: Production Hardening (6-8 hours)
+- Rate limiting (60 req/min per user)
+- Input sanitization
+- CORS configuration
+- Structured logging (JSON)
+- Error monitoring (Sentry)
+- Health check endpoint
+- Database migrations (Alembic)
+- CI/CD pipeline (GitHub Actions)
+
+### 🔮 Phase 6: Frontend Dashboard (Optional)
+- LIT web components
+- TypeScript
+- Real-time task updates
+- Drag-and-drop prioritization
+- **Deployment**: Cloudflare Pages
+  - Static hosting
+  - CDN + DDoS protection
+  - Free SSL
 
 ---
 
-### Option 2: Manual Setup
+## Deployment Architecture
 
-**Step-by-step walkthrough for those who prefer full control:**
+### Backend: DigitalOcean Droplet
 
-**Summary:**
-1. Create Google Sheet with `tasks` and `logs` tabs
-2. Deploy Google Apps Script as web app
-3. Configure Custom GPT with Actions schema
-4. Test end-to-end flow
+**Specs** (recommended):
+- Ubuntu 22.04 LTS
+- 2 GB RAM / 1 vCPU (Basic - $12/month)
+- Or 4 GB RAM / 2 vCPU (for higher traffic - $24/month)
 
-**Estimated Time:** 45 minutes
+**Database Options**:
+1. **Same Droplet**: PostgreSQL installed on app server (cheaper, simpler)
+2. **Managed Database**: DigitalOcean Managed PostgreSQL ($15/month, auto-backups)
 
-**Guide:** Follow [`DEPLOYMENT.md`](./DEPLOYMENT.md) for complete manual instructions.
+**Stack**:
+- FastAPI + Uvicorn (4 workers)
+- PostgreSQL 15
+- Nginx (reverse proxy)
+- Systemd (process management)
+- Let's Encrypt (free SSL)
 
-**Choose manual setup if:**
-- You want to understand every step in detail
-- You're deploying in a restricted environment
-- You prefer manual configuration over automation
+**Total Cost**: ~$12-27/month
+
+### Frontend: Cloudflare Pages
+
+**For LIT Dashboard** (optional):
+- Static hosting (free tier)
+- Global CDN
+- Free SSL
+- DDoS protection
+- Edge caching
+
+**Total Cost**: $0/month
+
+### Primary UI: ChatGPT Custom GPT
+
+**No hosting needed**:
+- OpenAI handles all infrastructure
+- Update Actions schema with API endpoint
+- Configure CORS in FastAPI
+- No additional cost
 
 ---
 
-## Testing & Demo
+## Documentation
 
-### Manual API Testing
+### Quick Links
 
-Use `curl` or Postman to test endpoints:
+- **Backend README**: [backend/README.md](./backend/README.md) - Development guide
+- **Architecture**: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - System design
+- **Implementation**: [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) - Code examples
+- **Deployment**: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Production setup
+- **Product Vision**: [docs/PRODUCT.md](./docs/PRODUCT.md) - Roadmap & strategy
+- **Phase 2 Plan**: [docs/PHASE2-PLAN-V2.md](./docs/PHASE2-PLAN-V2.md) - Database implementation
 
+### Live Demo (Phase 1 Prototype)
+
+- **Custom GPT**: [Try MindFlow](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow)
+- **Video Demo**: [5-minute walkthrough](https://www.loom.com/share/e29f24d461c94396aebe039ef77fb9b7)
+
+---
+
+## Migration from GAS/Sheets
+
+**Status**: Phase 2 (Database) complete, Phase 3 (API) ready to implement
+
+**What Changed**:
+- ❌ Google Apps Script → ✅ FastAPI (Python 3.11+)
+- ❌ Google Sheets → ✅ PostgreSQL 15
+- ❌ Synchronous → ✅ Async/await throughout
+- ✅ Custom GPT integration (unchanged)
+- ✅ Scoring algorithm (unchanged)
+
+**Data Migration**:
+- Not needed (clean slate for production)
+- Phase 1 remains functional as prototype
+- Custom GPT will be updated to point to new API (Phase 3)
+
+---
+
+## Troubleshooting
+
+### Backend Won't Start
+
+**Check**:
+1. Database connection: `docker ps | grep mindflow-test-db`
+2. Environment variables: `cat .env` (if exists)
+3. Dependencies: `uv pip list | grep fastapi`
+
+**Fix**:
 ```bash
-# Replace YOUR_SCRIPT_ID with your actual deployment ID
-BASE_URL="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
+# Reinstall dependencies
+make install-dev
 
-# Test 1: Create a task
-curl -X POST "${BASE_URL}?action=create" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Test task",
-    "priority": 3,
-    "due_date": "2025-11-01T17:00:00Z"
-  }'
+# Reset database
+make db-reset
 
-# Test 2: Get best task
-curl "${BASE_URL}?action=best"
-
-# Test 3: Query tasks
-curl "${BASE_URL}?action=query&status=pending"
+# Run with verbose logging
+make test -v
 ```
 
-### Conversational Testing (Custom GPT)
+### Database Connection Failed
 
-**Test Case 1: Empty State**
-```
-User: What should I do next?
-Expected: "You currently have no active tasks! Would you like to create one?"
-```
+**Docker container not running**:
+```bash
+# Check container status
+docker ps -a | grep mindflow-test-db
 
-**Test Case 2: Task Creation**
-```
-User: Create a task to prepare presentation by tomorrow, priority 5
-Expected: [Task created, shows confirmation with ID]
-```
+# Start container
+make db-up
 
-**Test Case 3: Best Task Query**
-```
-User: What should I do next?
-Expected: "You should work on 'Prepare presentation' - it's urgent (priority 5)
-          and due tomorrow (score: 92)."
+# View logs
+make db-logs
 ```
 
-**Test Case 4: Task Completion**
-```
-User: Mark that task as complete
-Expected: "Done! I've marked 'Prepare presentation' as complete."
-```
+**Wrong port**:
+- Test database uses port 54320 (not default 5432)
+- Check `TEST_DATABASE_URL` in tests/conftest.py
+- OrbStack may be using port 5432
 
-### Verification Checklist
+### Tests Failing
 
-After each test:
-- ✅ Check `tasks` sheet for correct data
-- ✅ Check `logs` sheet for audit trail
-- ✅ Verify `updated_at` timestamps change
-- ✅ Confirm GPT responses match reality
-
----
-
-## Assumptions & Trade-offs
-
-### Design Decisions
-
-| Decision | Assumption | Trade-off | Mitigation |
-|----------|-----------|-----------|------------|
-| **Public GAS endpoint** | Demo/testing only | Anyone can access | Use OAuth for production |
-| **Google Sheets as DB** | < 1000 tasks, single user | Limited scalability | Clear migration path to Postgres |
-| **Deterministic scoring** | Explainability > accuracy | No ML personalization | Can add ML layer later |
-| **No authentication** | Trusted environment | Security risk | Document hardening steps |
-| **Synchronous API** | Low concurrency | May timeout at scale | Use async/queue for production |
-
-### Why NOT Use ML for Scoring?
-
-**Reasons for rule-based approach:**
-1. **Explainability:** Users see exact reasoning ("due today + high priority")
-2. **Debuggability:** Scores are reproducible and testable
-3. **Transparency:** No black box; weights are visible
-4. **Speed:** No model inference latency
-5. **Simplicity:** No training data needed
-
-**When to switch to ML:**
-- User feedback on recommendations
-- Personalization (different users = different priorities)
-- Context awareness (calendar integration, location, etc.)
-
----
-
-## Future Improvements
-
-### Phase 2: Feature Enhancements
-- [ ] `/metrics` endpoint (tasks completed today, average completion time)
-- [ ] Google Calendar integration (block focus time automatically)
-- [ ] Recurring tasks (daily standup, weekly review)
-- [ ] Task dependencies (can't start B until A is complete)
-- [ ] Collaborative tasks (assign to others)
-
-### Phase 3: Production Hardening
-- [ ] OAuth 2.0 authentication
-- [ ] Rate limiting (60 req/min per user)
-- [ ] Input sanitization (XSS prevention)
-- [ ] HTTPS enforcement
-- [ ] Backup/restore functionality
-
-### Phase 4: Scale Migration
-
-**Transition to FastAPI + Postgres:**
-
-```python
-# Equivalent FastAPI endpoint
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/tasks/best")
-async def get_best_task(timezone: str = "UTC"):
-    tasks = await db.query(Task).filter(Task.status != 'completed')
-    scored = [(t, score_task(t)) for t in tasks]
-    best = max(scored, key=lambda x: x[1])
-    return {"id": best[0].id, "score": best[1], "reasoning": "..."}
+**Run with verbose output**:
+```bash
+make test-fast  # Skip coverage for speed
+uv run pytest -vv  # Very verbose
+uv run pytest tests/integration/test_database.py::TestTaskCRUD::test_create_task_returns_task_with_id -vv  # Specific test
 ```
 
-**Benefits:**
-- 1000+ QPS (vs GAS ~5-10 QPS)
-- Rich SQL queries
-- Multi-tenancy support
-- Background jobs
-- WebSocket support (real-time updates)
-
-**Migration Checklist:**
-- [ ] Implement Postgres schema
-- [ ] Port GAS logic to FastAPI
-- [ ] Deploy to Fly.io / Render
-- [ ] Update OpenAPI schema (new URL)
-- [ ] Sync data from Sheets → Postgres
-- [ ] Update Custom GPT config
-- [ ] Run integration tests
-- [ ] Switch traffic
-- [ ] Decommission GAS
-
----
-
-## Links
-
-### Live Demo
-- **Custom GPT:** [Try MindFlow](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow) - Live conversational task manager
-- **Video Demo:** [Watch 5-minute walkthrough](https://www.loom.com/share/e29f24d461c94396aebe039ef77fb9b7) - See MindFlow in action
-- **Google Sheet:** `[Configure your own - see DEPLOYMENT.md]`
-- **API Endpoint:** `[Deploy your own - see DEPLOYMENT.md]`
-
-### Documentation
-- **Deployment Guide:** [DEPLOYMENT.md](./DEPLOYMENT.md)
-- **Architecture Deep-Dive:** [docs/raw/architecture-1pager.md](./docs/raw/architecture-1pager.md)
-- **Testing Guide:** [TESTING.md](./TESTING.md)
-- **Custom GPT Setup:** [CUSTOM_GPT_SETUP.md](./CUSTOM_GPT_SETUP.md)
-
-### Source Code
-- **Google Apps Script:** [src/gas/Code.gs](./src/gas/Code.gs) - Complete API implementation
-- **OpenAPI Schema:** [src/gas/openapi-schema-gpt.json](./src/gas/openapi-schema-gpt.json) - GPT-optimized (6 operations, response limits)
+**Coverage below 90%**:
+- Phase 2 database layer: **>90%** ✅
+- Overall: 75.86% (schemas not tested yet - Phase 3)
 
 ---
 
 ## Contributing
 
-This is an MVP demonstration project. Contributions welcome for:
-- Bug fixes
-- Documentation improvements
-- Test coverage
-- Security hardening
-- Performance optimizations
+This is a production-focused project. Contributions welcome for:
+- **Bug fixes**: Critical issues, edge cases
+- **Documentation**: Improvements, examples, guides
+- **Test coverage**: Additional test cases
+- **Performance**: Optimizations with benchmarks
+- **Security**: Hardening, vulnerability fixes
 
-**Not accepting:**
-- Major architectural changes (out of scope for MVP)
-- ML/AI model integration (future phase)
+**Not accepting**:
+- Major architectural changes (scope already defined)
+- ML/AI model integration (deterministic scoring is intentional)
+- Feature requests outside roadmap
+
+**Code Standards**:
+- Python: Follow PEP 8, type hints required
+- Formatting: Use `make format` (ruff)
+- Linting: Use `make lint` (ruff)
+- Tests: `make test` must pass before commit
+- Commits: Conventional commits format
 
 ---
 
@@ -700,12 +586,24 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 ## Acknowledgments
 
-Built as a demonstration of AI-first architecture combining:
-- OpenAI Custom GPTs (Actions)
-- Google Apps Script (serverless backend)
-- Google Sheets (transparent data store)
-- Deterministic relevance scoring (explainable AI)
+Built as a demonstration of modern AI-first architecture:
+- **OpenAI Custom GPTs** - Natural language interface
+- **FastAPI** - Modern async Python framework
+- **PostgreSQL** - Battle-tested relational database
+- **AsyncPG** - High-performance async driver
+- **Deterministic scoring** - Explainable AI recommendations
+- **Modern tooling** - uv (fast deps) + ruff (fast linting)
 
 ---
 
-**Questions?** Open an issue or see [DEPLOYMENT.md](./DEPLOYMENT.md) for setup help.
+## Support
+
+- **Documentation**: [docs/](./docs/)
+- **Issues**: GitHub Issues
+- **Backend Guide**: [backend/README.md](./backend/README.md)
+
+---
+
+**Status**: Phase 2 Complete ✅ | **Next**: Phase 3 - API Endpoints 🚧
+
+**Questions?** See [backend/README.md](./backend/README.md) for detailed setup instructions.

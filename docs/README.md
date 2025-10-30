@@ -1,8 +1,8 @@
 # MindFlow Documentation
 
-**Version**: 1.0.0
+**Version**: 2.0.0
 **Last Updated**: 2025-10-30
-**Status**: Production-Ready
+**Status**: Phase 2 Complete - Database Layer Production-Ready
 
 ---
 
@@ -12,8 +12,9 @@
 |----------|---------|----------|
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** | System design, tech stack, data flow | Engineers, architects |
 | **[IMPLEMENTATION.md](./IMPLEMENTATION.md)** | Code examples, setup guide | Developers |
-| **[DEPLOYMENT.md](./DEPLOYMENT.md)** | Docker, Fly.io, production setup | DevOps, engineers |
+| **[DEPLOYMENT.md](./DEPLOYMENT.md)** | DigitalOcean deployment, production setup | DevOps, engineers |
 | **[PRODUCT.md](./PRODUCT.md)** | Roadmap, business model, vision | Product managers, founders |
+| **[PHASE2-PLAN-V2.md](./PHASE2-PLAN-V2.md)** | Database implementation plan (completed) | Engineers |
 
 ---
 
@@ -27,6 +28,8 @@
 - **Intelligent Prioritization**: AI suggests best task based on deadline, priority, effort
 - **ChatGPT Integration**: Works as a Custom GPT (no app switching)
 - **Transparent Reasoning**: "Recommended because: due today, high priority"
+- **Production Database**: PostgreSQL 15 with async/await performance
+- **Modern Tooling**: uv (fast deps) + ruff (fast linting) + Makefile (easy commands)
 
 ---
 
@@ -39,25 +42,17 @@
 ```bash
 # Clone repository
 git clone https://github.com/yourusername/mindflow.git
-cd mindflow
+cd mindflow/backend
 
-# Backend setup
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your DATABASE_URL, SECRET_KEY, etc.
-
-# Run migrations
-alembic upgrade head
-
-# Start server
-uvicorn app.main:app --reload
-# API available at http://localhost:8000
+# One-command setup (installs deps, starts DB, runs tests)
+make quick-start
 ```
+
+**This will**:
+1. Install dependencies with uv (10-100x faster than pip)
+2. Start PostgreSQL test database (Docker)
+3. Run 19 integration tests
+4. Verify >90% code coverage on database layer
 
 **Next Steps**:
 1. Read [IMPLEMENTATION.md](./IMPLEMENTATION.md) for detailed code examples
@@ -73,11 +68,11 @@ uvicorn app.main:app --reload
 
 ### For Users
 
-**Coming Soon**: Public beta launch (Q4 2025)
+**Live Prototype**: [Try MindFlow Custom GPT](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow)
 
-MindFlow will be available as a ChatGPT Custom GPT. To get early access:
-1. Join waitlist: [TBD]
-2. Follow updates on Twitter: [@mindflow_app]
+**Watch 5-Minute Demo**: [Loom Video Walkthrough](https://www.loom.com/share/e29f24d461c94396aebe039ef77fb9b7)
+
+**Production Beta**: Coming Q2 2026 (after Phase 3-5 completion)
 
 ---
 
@@ -88,12 +83,12 @@ MindFlow will be available as a ChatGPT Custom GPT. To get early access:
 **System design and technical decisions**
 
 - High-level architecture diagram
-- Tech stack rationale (FastAPI, PostgreSQL, LIT)
+- Tech stack rationale (FastAPI, PostgreSQL, AsyncPG)
 - Data model (database schema)
-- API design (OpenAPI specification)
+- API design (planned for Phase 3)
 - Task scoring algorithm (relevance formula)
-- Real-time updates (WebSockets)
 - Security & multi-tenancy
+- Performance considerations
 
 **Best For**: Understanding how the system works, making technical decisions
 
@@ -103,25 +98,27 @@ MindFlow will be available as a ChatGPT Custom GPT. To get early access:
 
 - Quick start guide (one-command setup)
 - Backend setup (FastAPI + PostgreSQL)
-- Database configuration (Supabase or local)
-- Frontend setup (LIT + TypeScript)
-- ChatGPT Custom GPT integration
-- Testing strategies
+- Database configuration (Docker or DigitalOcean)
+- Modern tooling (uv + ruff + Makefile)
+- Testing strategies (19 integration tests)
 - Common patterns
+- Development workflow
 
 **Best For**: Building the application, debugging issues
 
 ### 🚀 DEPLOYMENT.md
 
-**Production deployment to Fly.io**
+**Production deployment to DigitalOcean**
 
-- Docker setup (Dockerfile, docker-compose)
-- Fly.io deployment (step-by-step)
-- Database migration (Supabase or Fly.io Postgres)
+- DigitalOcean Droplet setup (Ubuntu 22.04 LTS)
+- PostgreSQL installation (same droplet or managed)
+- Nginx reverse proxy configuration
+- SSL with Let's Encrypt
+- Systemd service setup
 - Environment configuration (secrets management)
-- Monitoring & logging (Sentry, structured logs)
+- Monitoring & logging
 - Troubleshooting guide
-- CI/CD with GitHub Actions
+- Cost breakdown (~$12-27/month)
 
 **Best For**: Deploying to production, maintaining infrastructure
 
@@ -130,8 +127,8 @@ MindFlow will be available as a ChatGPT Custom GPT. To get early access:
 **Business vision, roadmap, and strategy**
 
 - Product vision (what we're building and why)
-- Current status (prototype → production transition)
-- Transition plan (dropping GAS/Sheets for FastAPI)
+- Current status (Phase 2 complete)
+- Transition plan (GAS/Sheets → FastAPI/PostgreSQL)
 - Roadmap (Q4 2025 → Q3 2026)
 - Business model (pricing, revenue projections)
 - Success metrics (KPIs, north star metric)
@@ -139,21 +136,85 @@ MindFlow will be available as a ChatGPT Custom GPT. To get early access:
 
 **Best For**: Understanding product direction, planning features
 
+### 📋 PHASE2-PLAN-V2.md
+
+**Database layer implementation plan (COMPLETED)**
+
+- Test-Driven Development approach
+- Function & test specifications
+- Implementation order (step-by-step)
+- Verification checklist
+- Time budget (4 hours actual)
+- Production deployment notes
+
+**Best For**: Understanding Phase 2 implementation, reference for Phase 3
+
+---
+
+## Current Status: Phase 2 Complete ✅
+
+### What's Been Built
+
+**Database Layer** (Production-Ready):
+- ✅ AsyncIO SQLAlchemy with PostgreSQL 15
+- ✅ Connection pooling (10 persistent + 5 overflow)
+- ✅ User, Task, UserPreferences, AuditLog models
+- ✅ Complete CRUD operations with transaction management
+- ✅ Multi-user isolation verified
+- ✅ 19 integration tests passing (>90% database layer coverage)
+- ✅ Modern tooling: uv + ruff + Makefile
+
+**Files Created**:
+```
+backend/
+├── app/
+│   ├── config.py              # ✅ Environment configuration
+│   ├── db/
+│   │   ├── database.py        # ✅ Async engine + pooling
+│   │   ├── models.py          # ✅ SQLAlchemy models
+│   │   └── crud.py            # ✅ Database operations
+│   └── schemas/
+│       └── task.py            # ✅ Pydantic validation
+├── tests/
+│   ├── conftest.py            # ✅ Pytest fixtures
+│   └── integration/
+│       └── test_database.py   # ✅ 19 integration tests
+├── pyproject.toml             # ✅ Modern dependencies (uv)
+├── Makefile                   # ✅ Development commands (30+)
+└── README.md                  # ✅ Comprehensive docs
+```
+
+### What's Next
+
+**Phase 3: API Endpoints** (4-5 hours):
+- FastAPI REST endpoints
+- `/api/tasks` CRUD operations
+- `/api/tasks/best` scoring endpoint
+- Request/response validation
+- Error handling middleware
+- OpenAPI documentation
+- 15-20 API endpoint tests
+- Deployment to DigitalOcean Droplet
+
 ---
 
 ## Tech Stack Summary
 
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| **Frontend** | LIT + TypeScript (optional) | Web components, 50KB bundle |
-| **Primary UI** | ChatGPT Custom GPT | Natural conversation interface |
-| **API** | FastAPI (Python 3.11+) | Async, type-safe, auto-docs |
-| **Database** | PostgreSQL (Supabase) | Relational + JSONB flexibility |
-| **Deployment** | Fly.io + Docker | Global edge, $10-50/month |
-| **Auth** | JWT tokens | Stateless, multi-user |
-| **Monitoring** | Sentry + structured logs | Error tracking, debugging |
+| Layer | Technology | Why | Status |
+|-------|-----------|-----|--------|
+| **Frontend** | Custom GPT | Natural conversation interface | ✅ Phase 1 |
+| **Optional UI** | LIT + TypeScript (TBD) | Web components, 50KB bundle | 🔮 Phase 6 |
+| **API** | FastAPI (Python 3.11+) | Async, type-safe, auto-docs | 🚧 Phase 3 |
+| **Database** | PostgreSQL 15 | ACID compliance, rich indexing | ✅ Phase 2 |
+| **Driver** | AsyncPG | Fastest Python driver, native async | ✅ Phase 2 |
+| **Package Manager** | uv | 10-100x faster than pip | ✅ Phase 2 |
+| **Linter/Formatter** | Ruff | 10-100x faster than pylint | ✅ Phase 2 |
+| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | 🚧 Phase 3 |
+| **Frontend Host** | Cloudflare Pages (optional) | Free tier, global CDN | 🔮 Phase 6 |
+| **Auth** | JWT tokens | Stateless, multi-user | 🔮 Phase 4 |
+| **Monitoring** | Structured logs + Sentry (TBD) | Error tracking, debugging | 🔮 Phase 5 |
 
-**Total Infrastructure Cost**: ~$35-40/month for production MVP
+**Total Infrastructure Cost**: ~$12-27/month for production MVP
 
 ---
 
@@ -161,38 +222,34 @@ MindFlow will be available as a ChatGPT Custom GPT. To get early access:
 
 ```
 mindflow/
-├── backend/
+├── backend/                     # ✅ Phase 2 Complete
 │   ├── app/
-│   │   ├── main.py              # FastAPI entry point
-│   │   ├── config.py            # Settings
-│   │   ├── api/                 # REST endpoints
-│   │   │   ├── tasks.py
-│   │   │   ├── users.py
-│   │   │   └── health.py
-│   │   ├── db/                  # Database
-│   │   │   ├── database.py      # Async engine
-│   │   │   ├── models.py        # SQLAlchemy ORM
-│   │   │   └── crud.py
-│   │   ├── schemas/             # Pydantic validation
-│   │   ├── services/            # Business logic
-│   │   │   └── scoring.py       # Task scoring
-│   │   └── middleware/
-│   │       └── auth.py          # JWT validation
-│   ├── migrations/              # Alembic
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── fly.toml
-├── frontend/                    # Optional LIT dashboard
-│   ├── src/
-│   │   ├── components/
-│   │   └── services/
-│   └── package.json
+│   │   ├── config.py            # Settings & environment
+│   │   ├── db/
+│   │   │   ├── database.py      # Async SQLAlchemy engine
+│   │   │   ├── models.py        # User, Task, Preferences, AuditLog
+│   │   │   └── crud.py          # Database operations
+│   │   ├── schemas/
+│   │   │   └── task.py          # Pydantic validation
+│   │   ├── api/                 # 🚧 Phase 3 - REST endpoints
+│   │   ├── services/            # 🚧 Phase 3 - Business logic
+│   │   └── middleware/          # 🔮 Phase 4 - JWT auth
+│   ├── tests/
+│   │   ├── conftest.py          # Pytest fixtures
+│   │   └── integration/
+│   │       └── test_database.py # 19 integration tests
+│   ├── pyproject.toml           # Dependencies (uv)
+│   ├── Makefile                 # 30+ development commands
+│   └── README.md                # Backend documentation
+├── frontend/                    # 🔮 Phase 6 - Optional LIT dashboard
 ├── docs/
 │   ├── README.md                # This file
-│   ├── ARCHITECTURE.md
-│   ├── IMPLEMENTATION.md
-│   ├── DEPLOYMENT.md
-│   └── PRODUCT.md
+│   ├── ARCHITECTURE.md          # System design
+│   ├── IMPLEMENTATION.md        # Setup guide
+│   ├── DEPLOYMENT.md            # DigitalOcean deployment
+│   ├── PRODUCT.md               # Business vision
+│   └── PHASE2-PLAN-V2.md        # Database implementation (done)
+├── src/gas/                     # Phase 1 prototype (archived)
 └── README.md                    # Project README
 ```
 
@@ -205,74 +262,95 @@ mindflow/
 ```bash
 # Start backend (terminal 1)
 cd backend
-source venv/bin/activate
-uvicorn app.main:app --reload
+make quick-start   # Or: make install-dev && make db-up && make test
 
-# Start frontend (terminal 2, optional)
-cd frontend
-npm run dev
+# Development server (Phase 3+)
+make run           # FastAPI with hot reload
 
-# Run tests (terminal 3)
-cd backend
-pytest tests/ -v
+# Run tests
+make test          # All tests with coverage
+make test-fast     # Skip coverage (faster)
+
+# Code quality
+make lint          # Check code style
+make format        # Auto-format code
+make check         # Run all checks (lint + format + test)
 ```
 
 ### 2. Making Changes
 
 ```bash
 # Create feature branch
-git checkout -b feature/task-filtering
+git checkout -b feature/api-endpoints
 
 # Make changes, test locally
-# ...
+make test
+make lint
 
-# Create database migration (if needed)
-alembic revision --autogenerate -m "Add task filtering"
-alembic upgrade head
-
-# Run tests
-pytest tests/ -v --cov=app
-
-# Commit and push
+# Commit (tests must pass)
 git add .
-git commit -m "Add task filtering feature"
-git push origin feature/task-filtering
+git commit -m "feat: add REST API endpoints"
+git push origin feature/api-endpoints
 ```
 
-### 3. Deploying to Production
+### 3. Deploying to Production (Phase 3+)
 
 ```bash
-# Deploy to Fly.io
-flyctl deploy
+# SSH to DigitalOcean Droplet
+ssh root@your-droplet-ip
+
+# Pull changes
+cd /opt/mindflow/backend
+git pull origin main
+
+# Install dependencies
+uv sync
+
+# Restart service
+sudo systemctl restart mindflow
 
 # Check logs
-flyctl logs
-
-# Verify deployment
-curl https://mindflow-api.fly.dev/health
+sudo journalctl -u mindflow -f
 ```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide.
 
 ---
 
 ## API Endpoints
 
-**Base URL**: `https://mindflow-api.fly.dev` (or `http://localhost:8000` locally)
+### Status
 
-### Core Endpoints
+**Phase 2 (Complete)**: ✅ Database layer with CRUD operations
+**Phase 3 (Next)**: 🚧 FastAPI REST endpoints (4-5 hours)
 
-| Endpoint | Method | Description | Auth |
-|----------|--------|-------------|------|
-| `/health` | GET | Health check | No |
-| `/api/tasks` | POST | Create task | Yes |
-| `/api/tasks` | GET | List tasks | Yes |
-| `/api/tasks/best` | GET | Get best task to work on | Yes |
-| `/api/tasks/{id}` | GET | Get specific task | Yes |
-| `/api/tasks/{id}` | PUT | Update task | Yes |
-| `/api/tasks/{id}` | DELETE | Delete task | Yes |
-| `/api/auth/register` | POST | Register new user | No |
-| `/api/auth/login` | POST | Login and get JWT | No |
+### Database Layer (Phase 2 - Complete)
 
-**API Documentation**: `http://localhost:8000/docs` (when running locally)
+**Available Operations**:
+- ✅ `TaskCRUD.create(session, data)` - Create task with transaction management
+- ✅ `TaskCRUD.get_by_id(session, task_id, user_id)` - Retrieve with user validation
+- ✅ `TaskCRUD.list_by_user(session, user_id, status)` - List with optional filter
+- ✅ `TaskCRUD.update(session, task_id, user_id, data)` - Update with error handling
+- ✅ `TaskCRUD.delete(session, task_id, user_id)` - Delete with ownership validation
+- ✅ `TaskCRUD.get_pending_tasks(session, user_id)` - Get actionable tasks
+
+### Planned REST Endpoints (Phase 3)
+
+**Base URL**: `https://your-droplet-ip:8000` (or custom domain)
+
+| Endpoint | Method | Description | Status |
+|----------|--------|-------------|--------|
+| `/health` | GET | Health check | 🚧 Phase 3 |
+| `/api/tasks` | POST | Create task | 🚧 Phase 3 |
+| `/api/tasks` | GET | List tasks | 🚧 Phase 3 |
+| `/api/tasks/best` | GET | Get best task to work on | 🚧 Phase 3 |
+| `/api/tasks/{id}` | GET | Get specific task | 🚧 Phase 3 |
+| `/api/tasks/{id}` | PUT | Update task | 🚧 Phase 3 |
+| `/api/tasks/{id}` | DELETE | Delete task | 🚧 Phase 3 |
+| `/api/auth/register` | POST | Register new user | 🔮 Phase 4 |
+| `/api/auth/login` | POST | Login and get JWT | 🔮 Phase 4 |
+
+**API Documentation**: `http://localhost:8000/docs` (automatic with FastAPI)
 
 ---
 
@@ -283,57 +361,67 @@ curl https://mindflow-api.fly.dev/health
 - `SECRET_KEY`: JWT signing key (32+ random bytes)
 
 **Optional**:
-- `OPENAI_API_KEY`: For GPT features (if needed)
-- `SENTRY_DSN`: Error tracking
 - `ENVIRONMENT`: `development` or `production`
+- `DEBUG`: `true` or `false`
 
 **Example** (`.env`):
 ```bash
-DATABASE_URL=postgresql+asyncpg://localhost/mindflow
-SECRET_KEY=your-secret-key-change-in-production
+# Database
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54320/mindflow_test
+
+# Security
+SECRET_KEY=your-secret-key-min-32-chars-change-in-production
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_HOURS=24
+
+# Environment
 ENVIRONMENT=development
+DEBUG=true
 ```
 
 ---
 
 ## Common Tasks
 
-### Run Database Migrations
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-### Create New Migration
-
-```bash
-alembic revision --autogenerate -m "Description of change"
-alembic upgrade head
-```
-
-### View Logs (Production)
-
-```bash
-flyctl logs
-flyctl logs --follow  # Stream logs
-```
-
 ### Run Tests
 
 ```bash
 cd backend
-pytest tests/ -v --cov=app
+make test          # All tests with coverage
+make test-fast     # Skip coverage (faster)
+make test-unit     # Unit tests only
+make test-integration  # Integration tests only
+make coverage      # HTML coverage report
 ```
 
-### Check API Health
+### Check Code Quality
 
 ```bash
-# Local
-curl http://localhost:8000/health
+make lint          # Check code style
+make lint-fix      # Auto-fix linting issues
+make format        # Format code with ruff
+make format-check  # Check formatting without changes
+make check         # Run all checks (lint + format + test)
+```
 
-# Production
-curl https://mindflow-api.fly.dev/health
+### Manage Database
+
+```bash
+make db-up         # Start PostgreSQL test database
+make db-down       # Stop test database
+make db-reset      # Reset database (clean slate)
+make db-shell      # Open PostgreSQL shell
+make db-logs       # Show database logs
+```
+
+### View API Documentation (Phase 3+)
+
+```bash
+# Start server
+make run
+
+# Open browser
+open http://localhost:8000/docs
 ```
 
 ---
@@ -343,94 +431,177 @@ curl https://mindflow-api.fly.dev/health
 ### Backend Won't Start
 
 **Check**:
-1. Database connection: `psql $DATABASE_URL`
-2. Environment variables: `printenv | grep DATABASE_URL`
-3. Dependencies: `pip list | grep fastapi`
+1. Database connection: `docker ps | grep mindflow-test-db`
+2. Environment variables: `cat .env`
+3. Dependencies: `uv pip list | grep fastapi`
 
 **Fix**:
 ```bash
 # Reinstall dependencies
-pip install -r requirements.txt
+make install-dev
 
-# Check database
-alembic upgrade head
+# Reset database
+make db-reset
 
 # Run with verbose logging
-uvicorn app.main:app --reload --log-level debug
+make test -v
 ```
 
 ### Database Connection Failed
 
-**Check Supabase**:
-1. Project is running (not paused)
-2. Connection pooling enabled (port 5432)
-3. Connection string format: `postgresql+asyncpg://...`
-
-**Test connection**:
+**Docker container not running**:
 ```bash
-psql "postgresql://user:pass@host:5432/postgres"
+# Check container status
+docker ps -a | grep mindflow-test-db
+
+# Start container
+make db-up
+
+# View logs
+make db-logs
 ```
 
-### Deployment Failed
+**Wrong port**:
+- Test database uses port 54320 (not default 5432)
+- Check `TEST_DATABASE_URL` in `tests/conftest.py`
+- OrbStack may be using port 5432
 
-**Check Fly.io**:
+### Tests Failing
+
+**Run with verbose output**:
 ```bash
-flyctl status
-flyctl logs
+make test-fast  # Skip coverage for speed
+uv run pytest -vv  # Very verbose
+uv run pytest tests/integration/test_database.py::TestTaskCRUD::test_create_task_returns_task_with_id -vv  # Specific test
 ```
 
-**Common issues**:
-- Missing secrets: `flyctl secrets list`
-- Out of memory: `flyctl scale memory 512`
-- Wrong region: `flyctl regions list`
+**Import errors**:
+```bash
+# Reinstall dependencies
+make install-dev
+
+# Verify installation
+uv pip list
+```
+
+---
+
+## Phase Roadmap
+
+### ✅ Phase 1: Prototype (Complete)
+- Google Apps Script backend
+- Google Sheets database
+- Custom GPT integration
+- Deterministic scoring algorithm
+- [Live Demo](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow)
+- [Video Walkthrough](https://www.loom.com/share/e29f24d461c94396aebe039ef77fb9b7)
+
+### ✅ Phase 2: Database Layer (Complete)
+- **Duration**: 4 hours
+- **Status**: ✅ Production-Ready
+- AsyncIO SQLAlchemy with PostgreSQL 15
+- Connection pooling (10 persistent + 5 overflow)
+- User, Task, UserPreferences, AuditLog models
+- Complete CRUD operations with transactions
+- Multi-user isolation verified
+- 19 integration tests passing (>90% coverage)
+- Modern tooling: uv + ruff + Makefile
+
+### 🚧 Phase 3: API Endpoints (Next - 4-5 hours)
+- FastAPI REST endpoints
+- Request/response validation
+- Error handling middleware
+- `/api/tasks` CRUD operations
+- `/api/tasks/best` scoring endpoint
+- OpenAPI documentation
+- 15-20 API endpoint tests
+- Deployment to DigitalOcean Droplet
+
+### 🔮 Phase 4: Authentication (5-6 hours)
+- JWT token generation
+- Password hashing (bcrypt)
+- `/api/auth/register` endpoint
+- `/api/auth/login` endpoint
+- Authentication middleware
+- Protected routes
+
+### 🔮 Phase 5: Production Hardening (6-8 hours)
+- Rate limiting (60 req/min per user)
+- Input sanitization
+- CORS configuration
+- Structured logging (JSON)
+- Error monitoring (Sentry)
+- Database migrations (Alembic)
+- CI/CD pipeline (GitHub Actions)
+
+### 🔮 Phase 6: Frontend Dashboard (Optional)
+- LIT web components
+- TypeScript
+- Real-time task updates
+- Deployment to Cloudflare Pages
 
 ---
 
 ## Contributing
 
-**Workflow**:
-1. Fork repository
-2. Create feature branch
-3. Make changes + add tests
-4. Submit pull request
+This is a production-focused project. Contributions welcome for:
+- Bug fixes
+- Documentation improvements
+- Test coverage
+- Security hardening
+- Performance optimizations
+
+**Not accepting**:
+- Major architectural changes (out of scope)
+- ML/AI model integration (future phase)
 
 **Code Standards**:
-- Python: Follow PEP 8, use `black` formatter
-- TypeScript: Use Prettier
-- Tests: Maintain >80% coverage
-- Commits: Use conventional commits format
+- Python: Follow PEP 8, use type hints
+- Formatting: Use `make format` (ruff)
+- Linting: Use `make lint` (ruff)
+- Tests: `make test` must pass
+- Commits: Conventional commits format
 
 ---
 
 ## Support
 
 - **Documentation**: This directory
-- **Issues**: github.com/yourusername/mindflow/issues
-- **Discussions**: github.com/yourusername/mindflow/discussions
-- **Discord**: [TBD]
-- **Email**: support@mindflow.app
+- **Backend Guide**: [../backend/README.md](../backend/README.md)
+- **Issues**: GitHub Issues
+- **Live Prototype**: [Custom GPT](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow)
 
 ---
 
 ## License
 
-[TBD - Add license information]
+MIT License - see [LICENSE](../LICENSE) for details.
 
 ---
 
 ## Changelog
 
+### Version 2.0.0 (2025-10-30)
+
+**Phase 2 Complete - Database Layer**:
+- ✅ AsyncIO SQLAlchemy with PostgreSQL 15
+- ✅ Connection pooling configuration
+- ✅ User, Task, UserPreferences, AuditLog models
+- ✅ Complete CRUD operations with transactions
+- ✅ Multi-user isolation verified
+- ✅ 19 integration tests passing
+- ✅ Modern tooling: uv + ruff + Makefile
+- ✅ Comprehensive documentation
+
 ### Version 1.0.0 (2025-10-30)
 
-**Initial Release**:
-- FastAPI backend with async PostgreSQL
-- JWT authentication
-- Task CRUD operations
-- Task scoring algorithm
-- ChatGPT Custom GPT integration
-- Fly.io deployment
-- Comprehensive documentation
+**Phase 1 Complete - Prototype**:
+- Google Apps Script backend
+- Google Sheets database
+- Custom GPT integration
+- Deterministic scoring algorithm
+- Live demo and video walkthrough
 
 ---
 
-**Next Steps**: Read [ARCHITECTURE.md](./ARCHITECTURE.md) to understand system design, or jump to [IMPLEMENTATION.md](./IMPLEMENTATION.md) to start coding.
+**Next Steps**: Proceed with Phase 3 (API Endpoints) or read [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
