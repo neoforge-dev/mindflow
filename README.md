@@ -661,6 +661,7 @@ async def get_best_task(timezone: str = "UTC"):
 
 ### Live Demo
 - **Custom GPT:** [Try MindFlow](https://chatgpt.com/g/g-69035fdcdd648191807929b189684451-mindflow) - Live conversational task manager
+- **Video Demo:** [Watch 5-minute walkthrough](https://www.loom.com/share/e29f24d461c94396aebe039ef77fb9b7) - See MindFlow in action
 - **Google Sheet:** `[Configure your own - see DEPLOYMENT.md]`
 - **API Endpoint:** `[Deploy your own - see DEPLOYMENT.md]`
 
