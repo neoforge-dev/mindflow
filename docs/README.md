@@ -1,8 +1,8 @@
 # MindFlow Documentation
 
-**Version**: 3.0.0
-**Last Updated**: 2025-10-30
-**Status**: Phase 3 Complete - API Endpoints Production-Ready
+**Version**: 4.0.0
+**Last Updated**: 2025-10-31
+**Status**: Phase 4 Complete - JWT Authentication Production-Ready
 
 ---
 
@@ -16,6 +16,7 @@
 | **[PRODUCT.md](./PRODUCT.md)** | Roadmap, business model, vision | Product managers, founders |
 | **[PHASE2-PLAN-V2.md](./PHASE2-PLAN-V2.md)** | Database implementation plan (completed) | Engineers |
 | **[PHASE3-PLAN.md](./PHASE3-PLAN.md)** | API endpoints implementation plan (completed) | Engineers |
+| **[PHASE4-PLAN.md](./PHASE4-PLAN.md)** | JWT authentication implementation plan (completed) | Engineers |
 
 ---
 
@@ -31,6 +32,7 @@
 - **Transparent Reasoning**: "Recommended because: due today, high priority"
 - **Production Database**: PostgreSQL 15 with async/await performance
 - **REST API**: FastAPI with automatic OpenAPI documentation
+- **JWT Authentication**: Secure stateless authentication with bcrypt password hashing
 - **Modern Tooling**: uv (fast deps) + ruff (fast linting) + Makefile (easy commands)
 
 ---
@@ -53,8 +55,8 @@ make quick-start
 **This will**:
 1. Install dependencies with uv (10-100x faster than pip)
 2. Start PostgreSQL test database (Docker)
-3. Run 40 tests (21 API + 19 database)
-4. Verify ~90% code coverage
+3. Run 73 tests (15 auth + 33 auth integration + 21 API + 19 database)
+4. Verify 88% code coverage
 
 **Next Steps**:
 1. Read [IMPLEMENTATION.md](./IMPLEMENTATION.md) for detailed code examples
@@ -153,21 +155,31 @@ make quick-start
 
 ---
 
-## Current Status: Phase 3 Complete ✅
+## Current Status: Phase 4 Complete ✅
 
 ### What's Been Built
 
+**Authentication & JWT** (Production-Ready):
+- ✅ JWT token generation with HS256 algorithm (24-hour expiration)
+- ✅ Bcrypt password hashing (12 rounds, NIST 2024 standards)
+- ✅ User registration with email uniqueness validation
+- ✅ Secure login with constant-time password verification
+- ✅ OAuth2PasswordBearer token extraction
+- ✅ Protected routes with dependency injection
+- ✅ Minimal JWT payload (only user_id, no PII)
+- ✅ User enumeration prevention (401 for all auth failures)
+- ✅ 33 auth tests passing (11 unit + 7 service + 15 API tests)
+
 **API Layer** (Production-Ready):
 - ✅ FastAPI REST endpoints with async/await
-- ✅ 7 API routes: POST, GET (list), GET (pending), GET (single), PUT, DELETE, health check
+- ✅ 10 API routes: auth (register, login, /me) + tasks (7 endpoints) + health
 - ✅ Request/response validation with Pydantic
-- ✅ Error handling middleware (400, 404, 500)
+- ✅ Error handling middleware (400, 401, 404, 500)
 - ✅ CORS configuration (dev + prod modes)
 - ✅ OpenAPI documentation (auto-generated)
 - ✅ Dependency injection for database sessions
-- ✅ 21 API tests passing + 19 database tests = 40 total tests
-- ✅ ~90% code coverage
-- ✅ Temporary auth via query params (Phase 4 will add JWT)
+- ✅ 73 tests passing (33 auth + 21 API + 19 database)
+- ✅ 88% code coverage
 
 **Database Layer** (Production-Ready):
 - ✅ AsyncIO SQLAlchemy with PostgreSQL 15
@@ -181,24 +193,33 @@ make quick-start
 ```
 backend/
 ├── app/
-│   ├── config.py              # ✅ Environment configuration
+│   ├── config.py              # ✅ Environment + JWT configuration
 │   ├── db/
 │   │   ├── database.py        # ✅ Async engine + pooling
 │   │   ├── models.py          # ✅ SQLAlchemy models
-│   │   └── crud.py            # ✅ Database operations
+│   │   └── crud.py            # ✅ Database operations (Task + User CRUD)
+│   ├── auth/
+│   │   ├── security.py        # ✅ Password hashing + JWT functions
+│   │   ├── schemas.py         # ✅ Auth Pydantic models
+│   │   └── service.py         # ✅ AuthService (register/login)
 │   ├── api/
-│   │   └── tasks.py           # ✅ FastAPI REST endpoints
-│   ├── dependencies.py        # ✅ Dependency injection
+│   │   ├── auth.py            # ✅ Auth endpoints (/register, /login, /me)
+│   │   └── tasks.py           # ✅ Task endpoints (JWT protected)
+│   ├── dependencies.py        # ✅ JWT validation + dependency injection
 │   ├── main.py                # ✅ FastAPI app setup
 │   └── schemas/
-│       └── task.py            # ✅ Pydantic validation
+│       └── task.py            # ✅ Task Pydantic models
 ├── tests/
-│   ├── conftest.py            # ✅ Pytest fixtures (API + DB)
+│   ├── conftest.py            # ✅ Pytest fixtures (API + DB + Auth)
+│   ├── auth/
+│   │   ├── test_security.py       # ✅ 11 unit tests
+│   │   ├── test_auth_service.py   # ✅ 7 integration tests
+│   │   └── test_auth_api.py       # ✅ 15 API tests
 │   ├── api/
-│   │   ├── test_health.py     # ✅ 2 health check tests
-│   │   └── test_tasks_api.py  # ✅ 19 API endpoint tests
+│   │   ├── test_health.py         # ✅ 2 health check tests
+│   │   └── test_tasks_api.py      # ✅ 21 API endpoint tests (JWT auth)
 │   └── integration/
-│       └── test_database.py   # ✅ 19 database tests
+│       └── test_database.py       # ✅ 19 database tests
 ├── pyproject.toml             # ✅ Modern dependencies (uv)
 ├── Makefile                   # ✅ Development commands (30+)
 └── README.md                  # ✅ Comprehensive docs
@@ -206,13 +227,13 @@ backend/
 
 ### What's Next
 
-**Phase 4: Authentication** (5-6 hours):
-- JWT token generation and validation
-- Password hashing with bcrypt
-- `/api/auth/register` endpoint
-- `/api/auth/login` endpoint
-- Authentication middleware
-- Protected routes
+**Phase 5: Production Hardening** (6-8 hours):
+- Rate limiting (60 req/min per user)
+- Input sanitization
+- Structured logging (JSON format)
+- Error monitoring (Sentry)
+- Database migrations (Alembic)
+- CI/CD pipeline (GitHub Actions)
 
 ---
 
@@ -227,9 +248,9 @@ backend/
 | **Driver** | AsyncPG | Fastest Python driver, native async | ✅ Phase 2 |
 | **Package Manager** | uv | 10-100x faster than pip | ✅ Phase 2 |
 | **Linter/Formatter** | Ruff | 10-100x faster than pylint | ✅ Phase 2 |
-| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | 🚧 Phase 4 |
+| **Auth** | JWT tokens + bcrypt | Stateless, secure hashing | ✅ Phase 4 |
+| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | 🔮 Phase 7 |
 | **Frontend Host** | Cloudflare Pages (optional) | Free tier, global CDN | 🔮 Phase 6 |
-| **Auth** | JWT tokens | Stateless, multi-user | 🔮 Phase 4 |
 | **Monitoring** | Structured logs + Sentry (TBD) | Error tracking, debugging | 🔮 Phase 5 |
 
 **Total Infrastructure Cost**: ~$12-27/month for production MVP
@@ -365,14 +386,15 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide.
 | `/api/tasks/{id}` | GET | Get specific task | ✅ Phase 3 |
 | `/api/tasks/{id}` | PUT | Update task | ✅ Phase 3 |
 | `/api/tasks/{id}` | DELETE | Delete task | ✅ Phase 3 |
-| `/api/tasks/best` | GET | Get best task to work on (scoring algorithm) | 🔮 Phase 4 |
-| `/api/auth/register` | POST | Register new user | 🔮 Phase 4 |
-| `/api/auth/login` | POST | Login and get JWT | 🔮 Phase 4 |
+| `/api/auth/register` | POST | Register new user | ✅ Phase 4 |
+| `/api/auth/login` | POST | Login and get JWT token | ✅ Phase 4 |
+| `/api/auth/me` | GET | Get current user info | ✅ Phase 4 |
+| `/api/tasks/best` | GET | Get best task to work on (scoring algorithm) | 🔮 Phase 6 |
 
 **API Documentation**: `http://localhost:8000/docs` (automatic OpenAPI/Swagger UI)
 **Alternative Docs**: `http://localhost:8000/redoc` (ReDoc interface)
 
-**Authentication**: Currently using query parameter `?user_id={uuid}` (temporary - Phase 4 will add JWT)
+**Authentication**: JWT tokens via `Authorization: Bearer <token>` header (all task endpoints require authentication)
 
 ---
 
@@ -539,15 +561,22 @@ uv pip list
 - CORS configuration (dev + prod modes)
 - OpenAPI documentation (auto-generated)
 - 21 API endpoint tests passing
-- Temporary auth via query params (JWT in Phase 4)
+- Temporary auth via query params (migrated to JWT in Phase 4)
 
-### 🔮 Phase 4: Authentication (5-6 hours)
-- JWT token generation
-- Password hashing (bcrypt)
-- `/api/auth/register` endpoint
-- `/api/auth/login` endpoint
-- Authentication middleware
-- Protected routes
+### ✅ Phase 4: Authentication (Complete)
+- **Duration**: 6-7 hours
+- **Status**: ✅ Production-Ready
+- JWT token generation with HS256 (24-hour expiration)
+- Bcrypt password hashing (12 rounds, NIST 2024 standards)
+- `/api/auth/register` endpoint with email validation
+- `/api/auth/login` endpoint with secure authentication
+- `/api/auth/me` endpoint for current user info
+- OAuth2PasswordBearer token extraction
+- Protected routes with dependency injection
+- Minimal JWT payload (only user_id, no PII)
+- User enumeration prevention (401 for all failures)
+- 33 auth tests passing (11 unit + 7 service + 15 API)
+- 88% code coverage (73 total tests)
 
 ### 🔮 Phase 5: Production Hardening (6-8 hours)
 - Rate limiting (60 req/min per user)
@@ -605,6 +634,23 @@ MIT License - see [LICENSE](../LICENSE) for details.
 
 ## Changelog
 
+### Version 4.0.0 (2025-10-31)
+
+**Phase 4 Complete - JWT Authentication**:
+- ✅ JWT token generation with HS256 algorithm (24-hour expiration)
+- ✅ Bcrypt password hashing (12 rounds, NIST 2024 standards)
+- ✅ User registration with email uniqueness validation
+- ✅ Secure login with constant-time password verification
+- ✅ `/api/auth/register`, `/api/auth/login`, `/api/auth/me` endpoints
+- ✅ OAuth2PasswordBearer token extraction (FastAPI standard)
+- ✅ Protected routes with dependency injection
+- ✅ Minimal JWT payload (only user_id, no PII for security)
+- ✅ User enumeration prevention (401 for all auth failures)
+- ✅ All task endpoints migrated from query params to JWT auth
+- ✅ 33 auth tests passing (11 unit + 7 service + 15 API)
+- ✅ 73 total tests passing (33 auth + 21 API + 19 database)
+- ✅ 88% code coverage (exceeds 85% target)
+
 ### Version 3.0.0 (2025-10-30)
 
 **Phase 3 Complete - API Endpoints**:
@@ -617,7 +663,7 @@ MIT License - see [LICENSE](../LICENSE) for details.
 - ✅ Dependency injection for database sessions
 - ✅ 21 API tests + 19 database tests = 40 total tests passing
 - ✅ ~90% code coverage
-- ✅ Temporary auth via query params (JWT in Phase 4)
+- ✅ Temporary auth via query params (migrated to JWT in Phase 4)
 
 ### Version 2.0.0 (2025-10-30)
 
@@ -642,4 +688,4 @@ MIT License - see [LICENSE](../LICENSE) for details.
 
 ---
 
-**Next Steps**: Proceed with Phase 4 (Authentication & JWT) or read [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
+**Next Steps**: Proceed with Phase 5 (Production Hardening) or read [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
