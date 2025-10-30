@@ -1,8 +1,8 @@
 # MindFlow Documentation
 
-**Version**: 2.0.0
+**Version**: 3.0.0
 **Last Updated**: 2025-10-30
-**Status**: Phase 2 Complete - Database Layer Production-Ready
+**Status**: Phase 3 Complete - API Endpoints Production-Ready
 
 ---
 
@@ -15,6 +15,7 @@
 | **[DEPLOYMENT.md](./DEPLOYMENT.md)** | DigitalOcean deployment, production setup | DevOps, engineers |
 | **[PRODUCT.md](./PRODUCT.md)** | Roadmap, business model, vision | Product managers, founders |
 | **[PHASE2-PLAN-V2.md](./PHASE2-PLAN-V2.md)** | Database implementation plan (completed) | Engineers |
+| **[PHASE3-PLAN.md](./PHASE3-PLAN.md)** | API endpoints implementation plan (completed) | Engineers |
 
 ---
 
@@ -29,6 +30,7 @@
 - **ChatGPT Integration**: Works as a Custom GPT (no app switching)
 - **Transparent Reasoning**: "Recommended because: due today, high priority"
 - **Production Database**: PostgreSQL 15 with async/await performance
+- **REST API**: FastAPI with automatic OpenAPI documentation
 - **Modern Tooling**: uv (fast deps) + ruff (fast linting) + Makefile (easy commands)
 
 ---
@@ -51,8 +53,8 @@ make quick-start
 **This will**:
 1. Install dependencies with uv (10-100x faster than pip)
 2. Start PostgreSQL test database (Docker)
-3. Run 19 integration tests
-4. Verify >90% code coverage on database layer
+3. Run 40 tests (21 API + 19 database)
+4. Verify ~90% code coverage
 
 **Next Steps**:
 1. Read [IMPLEMENTATION.md](./IMPLEMENTATION.md) for detailed code examples
@@ -151,9 +153,21 @@ make quick-start
 
 ---
 
-## Current Status: Phase 2 Complete ✅
+## Current Status: Phase 3 Complete ✅
 
 ### What's Been Built
+
+**API Layer** (Production-Ready):
+- ✅ FastAPI REST endpoints with async/await
+- ✅ 7 API routes: POST, GET (list), GET (pending), GET (single), PUT, DELETE, health check
+- ✅ Request/response validation with Pydantic
+- ✅ Error handling middleware (400, 404, 500)
+- ✅ CORS configuration (dev + prod modes)
+- ✅ OpenAPI documentation (auto-generated)
+- ✅ Dependency injection for database sessions
+- ✅ 21 API tests passing + 19 database tests = 40 total tests
+- ✅ ~90% code coverage
+- ✅ Temporary auth via query params (Phase 4 will add JWT)
 
 **Database Layer** (Production-Ready):
 - ✅ AsyncIO SQLAlchemy with PostgreSQL 15
@@ -161,7 +175,6 @@ make quick-start
 - ✅ User, Task, UserPreferences, AuditLog models
 - ✅ Complete CRUD operations with transaction management
 - ✅ Multi-user isolation verified
-- ✅ 19 integration tests passing (>90% database layer coverage)
 - ✅ Modern tooling: uv + ruff + Makefile
 
 **Files Created**:
@@ -173,12 +186,19 @@ backend/
 │   │   ├── database.py        # ✅ Async engine + pooling
 │   │   ├── models.py          # ✅ SQLAlchemy models
 │   │   └── crud.py            # ✅ Database operations
+│   ├── api/
+│   │   └── tasks.py           # ✅ FastAPI REST endpoints
+│   ├── dependencies.py        # ✅ Dependency injection
+│   ├── main.py                # ✅ FastAPI app setup
 │   └── schemas/
 │       └── task.py            # ✅ Pydantic validation
 ├── tests/
-│   ├── conftest.py            # ✅ Pytest fixtures
+│   ├── conftest.py            # ✅ Pytest fixtures (API + DB)
+│   ├── api/
+│   │   ├── test_health.py     # ✅ 2 health check tests
+│   │   └── test_tasks_api.py  # ✅ 19 API endpoint tests
 │   └── integration/
-│       └── test_database.py   # ✅ 19 integration tests
+│       └── test_database.py   # ✅ 19 database tests
 ├── pyproject.toml             # ✅ Modern dependencies (uv)
 ├── Makefile                   # ✅ Development commands (30+)
 └── README.md                  # ✅ Comprehensive docs
@@ -186,15 +206,13 @@ backend/
 
 ### What's Next
 
-**Phase 3: API Endpoints** (4-5 hours):
-- FastAPI REST endpoints
-- `/api/tasks` CRUD operations
-- `/api/tasks/best` scoring endpoint
-- Request/response validation
-- Error handling middleware
-- OpenAPI documentation
-- 15-20 API endpoint tests
-- Deployment to DigitalOcean Droplet
+**Phase 4: Authentication** (5-6 hours):
+- JWT token generation and validation
+- Password hashing with bcrypt
+- `/api/auth/register` endpoint
+- `/api/auth/login` endpoint
+- Authentication middleware
+- Protected routes
 
 ---
 
@@ -204,12 +222,12 @@ backend/
 |-------|-----------|-----|--------|
 | **Frontend** | Custom GPT | Natural conversation interface | ✅ Phase 1 |
 | **Optional UI** | LIT + TypeScript (TBD) | Web components, 50KB bundle | 🔮 Phase 6 |
-| **API** | FastAPI (Python 3.11+) | Async, type-safe, auto-docs | 🚧 Phase 3 |
+| **API** | FastAPI (Python 3.11+) | Async, type-safe, auto-docs | ✅ Phase 3 |
 | **Database** | PostgreSQL 15 | ACID compliance, rich indexing | ✅ Phase 2 |
 | **Driver** | AsyncPG | Fastest Python driver, native async | ✅ Phase 2 |
 | **Package Manager** | uv | 10-100x faster than pip | ✅ Phase 2 |
 | **Linter/Formatter** | Ruff | 10-100x faster than pylint | ✅ Phase 2 |
-| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | 🚧 Phase 3 |
+| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | 🚧 Phase 4 |
 | **Frontend Host** | Cloudflare Pages (optional) | Free tier, global CDN | 🔮 Phase 6 |
 | **Auth** | JWT tokens | Stateless, multi-user | 🔮 Phase 4 |
 | **Monitoring** | Structured logs + Sentry (TBD) | Error tracking, debugging | 🔮 Phase 5 |
@@ -334,23 +352,27 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide.
 - ✅ `TaskCRUD.delete(session, task_id, user_id)` - Delete with ownership validation
 - ✅ `TaskCRUD.get_pending_tasks(session, user_id)` - Get actionable tasks
 
-### Planned REST Endpoints (Phase 3)
+### REST API Endpoints (Phase 3 - Complete)
 
-**Base URL**: `https://your-droplet-ip:8000` (or custom domain)
+**Base URL**: `http://localhost:8000` (development) or `https://your-domain.com` (production)
 
 | Endpoint | Method | Description | Status |
 |----------|--------|-------------|--------|
-| `/health` | GET | Health check | 🚧 Phase 3 |
-| `/api/tasks` | POST | Create task | 🚧 Phase 3 |
-| `/api/tasks` | GET | List tasks | 🚧 Phase 3 |
-| `/api/tasks/best` | GET | Get best task to work on | 🚧 Phase 3 |
-| `/api/tasks/{id}` | GET | Get specific task | 🚧 Phase 3 |
-| `/api/tasks/{id}` | PUT | Update task | 🚧 Phase 3 |
-| `/api/tasks/{id}` | DELETE | Delete task | 🚧 Phase 3 |
+| `/health` | GET | Health check | ✅ Phase 3 |
+| `/api/tasks` | POST | Create task | ✅ Phase 3 |
+| `/api/tasks` | GET | List tasks (optional status filter) | ✅ Phase 3 |
+| `/api/tasks/pending` | GET | Get actionable tasks (pending + in_progress) | ✅ Phase 3 |
+| `/api/tasks/{id}` | GET | Get specific task | ✅ Phase 3 |
+| `/api/tasks/{id}` | PUT | Update task | ✅ Phase 3 |
+| `/api/tasks/{id}` | DELETE | Delete task | ✅ Phase 3 |
+| `/api/tasks/best` | GET | Get best task to work on (scoring algorithm) | 🔮 Phase 4 |
 | `/api/auth/register` | POST | Register new user | 🔮 Phase 4 |
 | `/api/auth/login` | POST | Login and get JWT | 🔮 Phase 4 |
 
-**API Documentation**: `http://localhost:8000/docs` (automatic with FastAPI)
+**API Documentation**: `http://localhost:8000/docs` (automatic OpenAPI/Swagger UI)
+**Alternative Docs**: `http://localhost:8000/redoc` (ReDoc interface)
+
+**Authentication**: Currently using query parameter `?user_id={uuid}` (temporary - Phase 4 will add JWT)
 
 ---
 
@@ -507,15 +529,17 @@ uv pip list
 - 19 integration tests passing (>90% coverage)
 - Modern tooling: uv + ruff + Makefile
 
-### 🚧 Phase 3: API Endpoints (Next - 4-5 hours)
-- FastAPI REST endpoints
-- Request/response validation
-- Error handling middleware
-- `/api/tasks` CRUD operations
-- `/api/tasks/best` scoring endpoint
-- OpenAPI documentation
-- 15-20 API endpoint tests
-- Deployment to DigitalOcean Droplet
+### ✅ Phase 3: API Endpoints (Complete)
+- **Duration**: 4 hours
+- **Status**: ✅ Production-Ready
+- FastAPI REST endpoints with async/await
+- 7 API routes: POST, GET (list/pending/single), PUT, DELETE, health
+- Request/response validation with Pydantic
+- Error handling middleware (400, 404, 500)
+- CORS configuration (dev + prod modes)
+- OpenAPI documentation (auto-generated)
+- 21 API endpoint tests passing
+- Temporary auth via query params (JWT in Phase 4)
 
 ### 🔮 Phase 4: Authentication (5-6 hours)
 - JWT token generation
@@ -581,6 +605,20 @@ MIT License - see [LICENSE](../LICENSE) for details.
 
 ## Changelog
 
+### Version 3.0.0 (2025-10-30)
+
+**Phase 3 Complete - API Endpoints**:
+- ✅ FastAPI REST endpoints with async/await
+- ✅ 7 API routes: POST, GET (list/pending/single), PUT, DELETE, health
+- ✅ Request/response validation with Pydantic
+- ✅ Error handling middleware (400, 404, 500)
+- ✅ CORS configuration (dev + prod modes)
+- ✅ OpenAPI documentation (auto-generated at `/docs`)
+- ✅ Dependency injection for database sessions
+- ✅ 21 API tests + 19 database tests = 40 total tests passing
+- ✅ ~90% code coverage
+- ✅ Temporary auth via query params (JWT in Phase 4)
+
 ### Version 2.0.0 (2025-10-30)
 
 **Phase 2 Complete - Database Layer**:
@@ -604,4 +642,4 @@ MIT License - see [LICENSE](../LICENSE) for details.
 
 ---
 
-**Next Steps**: Proceed with Phase 3 (API Endpoints) or read [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
+**Next Steps**: Proceed with Phase 4 (Authentication & JWT) or read [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
