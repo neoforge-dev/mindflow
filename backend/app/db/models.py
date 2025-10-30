@@ -1,14 +1,18 @@
 """SQLAlchemy database models."""
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, Text, Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+
 import uuid
 from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
 from .database import Base
 
 
 class User(Base):
     """User model with authentication and plan information."""
+
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -26,6 +30,7 @@ class User(Base):
 
 class Task(Base):
     """Task model with scoring fields."""
+
     __tablename__ = "tasks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -61,6 +66,7 @@ class Task(Base):
 
 class UserPreferences(Base):
     """User preferences for task scoring weights."""
+
     __tablename__ = "user_preferences"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -83,6 +89,7 @@ class UserPreferences(Base):
 
 class AuditLog(Base):
     """Audit log for tracking API operations (from GAS logs sheet)."""
+
     __tablename__ = "audit_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

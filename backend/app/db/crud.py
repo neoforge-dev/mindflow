@@ -1,10 +1,13 @@
 """CRUD operations for tasks with transaction management."""
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import and_, or_
-from typing import List, Optional, Dict, Any
+
 import uuid
 from datetime import datetime
+from typing import Any
+
+from sqlalchemy import and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
 from .models import Task
 
 
@@ -12,7 +15,7 @@ class TaskCRUD:
     """Task database operations with proper error handling."""
 
     @staticmethod
-    async def create(session: AsyncSession, data: Dict[str, Any]) -> Task:
+    async def create(session: AsyncSession, data: dict[str, Any]) -> Task:
         """Create new task with transaction handling."""
         try:
             task = Task(**data)
@@ -20,33 +23,24 @@ class TaskCRUD:
             await session.commit()
             await session.refresh(task)
             return task
-        except Exception as e:
+        except Exception:
             await session.rollback()
             raise
 
     @staticmethod
     async def get_by_id(
-        session: AsyncSession,
-        task_id: uuid.UUID,
-        user_id: uuid.UUID
-    ) -> Optional[Task]:
+        session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Task | None:
         """Get task by ID with user validation (returns None if not found or wrong user)."""
         result = await session.execute(
-            select(Task).where(
-                and_(
-                    Task.id == task_id,
-                    Task.user_id == user_id
-                )
-            )
+            select(Task).where(and_(Task.id == task_id, Task.user_id == user_id))
         )
         return result.scalars().first()
 
     @staticmethod
     async def list_by_user(
-        session: AsyncSession,
-        user_id: uuid.UUID,
-        status: Optional[str] = None
-    ) -> List[Task]:
+        session: AsyncSession, user_id: uuid.UUID, status: str | None = None
+    ) -> list[Task]:
         """List user's tasks with optional status filter."""
         query = select(Task).where(Task.user_id == user_id)
 
@@ -60,10 +54,7 @@ class TaskCRUD:
 
     @staticmethod
     async def update(
-        session: AsyncSession,
-        task_id: uuid.UUID,
-        user_id: uuid.UUID,
-        data: Dict[str, Any]
+        session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID, data: dict[str, Any]
     ) -> Task:
         """Update task with error handling."""
         try:
@@ -79,16 +70,12 @@ class TaskCRUD:
             await session.commit()
             await session.refresh(task)
             return task
-        except Exception as e:
+        except Exception:
             await session.rollback()
             raise
 
     @staticmethod
-    async def delete(
-        session: AsyncSession,
-        task_id: uuid.UUID,
-        user_id: uuid.UUID
-    ) -> None:
+    async def delete(session: AsyncSession, task_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """Delete task with ownership validation."""
         try:
             task = await TaskCRUD.get_by_id(session, task_id, user_id)
@@ -96,15 +83,12 @@ class TaskCRUD:
             if task:
                 await session.delete(task)
                 await session.commit()
-        except Exception as e:
+        except Exception:
             await session.rollback()
             raise
 
     @staticmethod
-    async def get_pending_tasks(
-        session: AsyncSession,
-        user_id: uuid.UUID
-    ) -> List[Task]:
+    async def get_pending_tasks(session: AsyncSession, user_id: uuid.UUID) -> list[Task]:
         """Get all pending/in-progress tasks for user (excludes completed and snoozed)."""
         now = datetime.utcnow()
         result = await session.execute(
@@ -113,10 +97,7 @@ class TaskCRUD:
                     Task.user_id == user_id,
                     Task.status.in_(["pending", "in_progress"]),
                     # Exclude snoozed tasks that are still sleeping
-                    or_(
-                        Task.snoozed_until == None,
-                        Task.snoozed_until <= now
-                    )
+                    or_(Task.snoozed_until.is_(None), Task.snoozed_until <= now),
                 )
             )
         )
