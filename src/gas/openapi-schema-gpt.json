@@ -1,0 +1,444 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MindFlow Task Manager",
+    "description": "AI-first task management with intelligent prioritization",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://script.google.com/macros/s/AKfycbwz_zgYRCztreHox0qpWBQLdo5F174ZE8oiNUb_IcOYjtR3jJho8GHpSlruQaqJ1eJWqQ",
+      "description": "MindFlow API"
+    }
+  ],
+  "paths": {
+    "/exec": {
+      "get": {
+        "operationId": "getBestTask",
+        "summary": "Get the best task to work on right now",
+        "description": "Returns the highest-priority task based on urgency, importance, and context. Always includes a score and reasoning.",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["best"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Best task with score and reasoning",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Task UUID"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        },
+                        "due_date": {
+                          "type": "string"
+                        },
+                        "score": {
+                          "type": "integer",
+                          "description": "Relevance score (0-100)"
+                        },
+                        "reasoning": {
+                          "type": "string",
+                          "description": "Why this task was chosen"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exec?action=query": {
+      "get": {
+        "operationId": "queryTasks",
+        "summary": "List tasks with filters",
+        "description": "Get a list of tasks filtered by status or priority. Returns max 10 tasks by default to avoid size issues.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "in_progress", "completed", "snoozed"]
+            },
+            "description": "Filter by task status"
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "description": "Filter by priority (1=low, 5=urgent)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "maximum": 20
+            },
+            "description": "Max results (default 10, max 20)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "priority": {
+                            "type": "integer"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "due_date": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exec?action=create": {
+      "post": {
+        "operationId": "createTask",
+        "summary": "Create a new task",
+        "description": "Add a new task with title, priority (1-5), optional description and due date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "priority"],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Task title",
+                    "maxLength": 256
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Optional details about the task"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "description": "Priority: 1=low, 2=normal, 3=medium, 4=high, 5=urgent",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "description": "Due date in ISO8601 format (e.g., 2025-11-15T17:00:00Z)"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "created"
+                    },
+                    "code": {
+                      "type": "integer",
+                      "example": 201
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exec?action=update": {
+      "post": {
+        "operationId": "updateTask",
+        "summary": "Update a task",
+        "description": "Modify task fields like title, priority, status, or due date.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Task ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["pending", "in_progress", "completed", "snoozed"]
+                  },
+                  "due_date": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "integer"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exec?action=complete": {
+      "post": {
+        "operationId": "completeTask",
+        "summary": "Mark a task as complete",
+        "description": "Mark the specified task as completed. This removes it from active task queries.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Task ID to complete"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task marked as complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "integer"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exec?action=snooze": {
+      "post": {
+        "operationId": "snoozeTask",
+        "summary": "Snooze a task",
+        "description": "Hide a task until later. Use durations like '2h', '1d', or '1w'.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Task ID to snooze"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["snooze_duration"],
+                "properties": {
+                  "snooze_duration": {
+                    "type": "string",
+                    "description": "Duration: 1h, 2h, 4h, 1d, 2d, 1w",
+                    "pattern": "^\\d+(h|d|w)$",
+                    "example": "2h"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task snoozed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "snoozed_until": {
+                          "type": "string",
+                          "description": "When task will reappear"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
