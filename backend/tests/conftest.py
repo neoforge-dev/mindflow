@@ -11,11 +11,11 @@ import os
 # Use PostgreSQL for tests (matches production)
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/mindflow_test"
+    "postgresql+asyncpg://postgres:postgres@localhost:54320/mindflow_test"
 )
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def db_engine():
     """Create test database engine with proper cleanup."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -41,9 +41,9 @@ async def db_session(db_engine):
     )
 
     async with async_session() as session:
-        async with session.begin():
-            yield session
-            await session.rollback()  # Rollback after test (isolation)
+        yield session
+        await session.rollback()  # Rollback any uncommitted changes
+        await session.close()
 
 
 @pytest_asyncio.fixture
