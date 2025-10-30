@@ -76,20 +76,59 @@ async def test_user_2(db_session):
 
 
 @pytest_asyncio.fixture
-async def test_task(db_session, test_user):
+async def test_task(db_engine, test_user):
     """Create test task."""
     from datetime import datetime, timedelta
 
     from app.db.crud import TaskCRUD
 
-    task = await TaskCRUD.create(
-        db_session,
-        {
-            "title": "Test task",
-            "description": "Test description",
-            "priority": 3,
-            "due_date": datetime.utcnow() + timedelta(days=1),
-            "user_id": test_user.id,
-        },
-    )
-    return task
+    # Create task in its own session that commits independently
+    async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
+        task = await TaskCRUD.create(
+            session,
+            {
+                "title": "Test task",
+                "description": "Test description",
+                "priority": 3,
+                "due_date": datetime.utcnow() + timedelta(days=1),
+                "user_id": test_user.id,
+            },
+        )
+        await session.commit()
+        await session.refresh(task)
+        return task
+
+
+# API Testing Fixtures
+
+
+@pytest_asyncio.fixture
+async def test_client(db_engine):
+    """Async HTTP client for API testing with database override."""
+    from httpx import ASGITransport, AsyncClient
+
+    from app.dependencies import get_db
+    from app.main import app
+
+    # Override get_db dependency to use test database
+    async def override_get_db():
+        async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+
+    # Clean up
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def authenticated_client(test_client, test_user):
+    """Client with user_id stored for convenience."""
+    # Store user_id - tests must include ?user_id={client.user_id} in URLs
+    test_client.user_id = test_user.id
+    return test_client
