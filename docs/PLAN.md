@@ -81,8 +81,9 @@ AI Scoring Algorithm (7.2ms)
 **Effort**: 40 hours
 **Business Value**: Can accept first 1000 paying users
 
-### 8A: Critical Auth Features (6 days, 24 hours)
+### 8A: Critical Auth Features ✅ COMPLETE (6 days, 24 hours)
 
+**Status**: ✅ **PRODUCTION READY** (Completed 2025-10-31)
 **Why Critical**: Users locked out = churn
 
 #### Features (Pareto 20%)
@@ -475,7 +476,7 @@ tests/frontend/
 
 ### Week 2: Landing Page + Deployment
 
-**Days 8-9**: Landing Page ✅ COMPLETE
+**Days 8-9**: Landing Page ✅ COMPLETE (2025-10-30)
 - ✅ Designed and built `frontend/index.html` with Tailwind CSS
 - ✅ Created animated demo (ChatGPT conversation with typewriter effect)
 - ✅ Added dual CTAs to Custom GPT
@@ -483,7 +484,7 @@ tests/frontend/
 - ✅ 40+ Playwright tests written
 - ✅ Validation script passing all checks
 
-**Days 10-11**: Production Deployment
+**Days 10-11**: Production Deployment (NEXT - Phase 8C)
 - Provision DigitalOcean droplet
 - Run `deployment/setup.sh` script
 - Configure environment variables
@@ -592,11 +593,11 @@ tests/frontend/
 ## 🎯 PRIORITY DECISION MATRIX
 
 ### Must Have (Blocks Launch)
-- ✅ Password reset
-- ✅ Refresh tokens
-- ✅ Landing page
-- ✅ Production deployment
-- ✅ Custom GPT migration
+- ✅ Password reset (Phase 8A - COMPLETE)
+- ✅ Refresh tokens (Phase 8A - COMPLETE)
+- ✅ Landing page (Phase 8B - COMPLETE)
+- ⏳ Production deployment (Phase 8C - IN PROGRESS)
+- ⏳ Custom GPT migration (Phase 8C - IN PROGRESS)
 
 ### Should Have (Launch Week 2)
 - ⏳ Email verification
@@ -620,19 +621,19 @@ tests/frontend/
 
 ## 📝 IMPLEMENTATION CHECKLIST
 
-### Week 1: Authentication
-- [ ] Day 1: Create database tables (password_reset_tokens, refresh_tokens)
-- [ ] Day 2: Write Alembic migration, test rollback
-- [ ] Day 3: SendGrid integration, email templates
-- [ ] Day 4: Password reset endpoints (/forgot-password, /reset-password)
-- [ ] Day 5: Refresh token CRUD + /login modifications
-- [ ] Day 6: /refresh endpoint + /revoke endpoint
-- [ ] Day 7: Write 20+ tests, manual testing, security review
+### Week 1: Authentication ✅ COMPLETE
+- [x] Day 1: Create database tables (password_reset_tokens, refresh_tokens)
+- [x] Day 2: Write Alembic migration, test rollback
+- [x] Day 3: SendGrid integration, email templates
+- [x] Day 4: Password reset endpoints (/forgot-password, /reset-password)
+- [x] Day 5: Refresh token CRUD + /login modifications
+- [x] Day 6: /refresh endpoint + /revoke endpoint
+- [x] Day 7: Write 20+ tests, manual testing, security review
 
 ### Week 2: Launch
-- [ ] Day 8: Design landing page wireframe
-- [ ] Day 9: Build frontend/index.html with Tailwind
-- [ ] Day 10: Provision DigitalOcean droplet
+- [x] Day 8: Design landing page wireframe
+- [x] Day 9: Build frontend/index.html with Tailwind
+- [ ] Day 10: Provision DigitalOcean droplet (NEXT)
 - [ ] Day 11: Run deployment scripts, configure SSL
 - [ ] Day 12: Generate OpenAPI schema, update Custom GPT
 - [ ] Day 13: Beta testing with 5-10 users
