@@ -8,6 +8,10 @@ from app.config import settings
 from app.logging_config import configure_logging, get_logger
 from app.middleware.rate_limit import setup_rate_limiting
 from app.middleware.request_logging import RequestIDMiddleware
+from app.monitoring import init_sentry
+
+# Initialize Sentry error monitoring (if configured)
+init_sentry(settings)
 
 # Setup structured logging
 configure_logging()

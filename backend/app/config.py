@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     environment: str = os.getenv("ENVIRONMENT", "development")
     debug: bool = environment == "development"
 
+    # Monitoring
+    sentry_dsn: str | None = os.getenv("SENTRY_DSN", None)
+
     @property
     def is_testing(self) -> bool:
         """Check if running in test environment."""
