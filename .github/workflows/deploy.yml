@@ -1,0 +1,221 @@
+name: Deploy MindFlow Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  DROPLET_IP: ${{ secrets.DROPLET_IP }}
+  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mindflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Run linter
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Check formatting
+        working-directory: backend
+        run: uv run ruff format --check .
+
+      - name: Run tests with coverage
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/mindflow_test
+          SECRET_KEY: test-secret-key-min-32-chars-for-testing-only
+        run: uv run pytest --cov --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+  build:
+    name: Build and Package
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Build package
+        working-directory: backend
+        run: uv build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to DigitalOcean
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+        run: |
+          # Create deployment script
+          cat > deploy.sh <<'EOF'
+          #!/bin/bash
+          set -e
+
+          echo "🚀 Starting MindFlow deployment..."
+
+          # Navigate to app directory
+          cd /opt/mindflow/backend
+
+          # Pull latest changes
+          echo "📥 Pulling latest code..."
+          git pull origin main
+
+          # Install dependencies
+          echo "📦 Installing dependencies..."
+          uv sync
+
+          # Run database migrations
+          echo "🗄️  Running database migrations..."
+          uv run alembic upgrade head
+
+          # Restart service
+          echo "🔄 Restarting MindFlow service..."
+          sudo systemctl restart mindflow
+
+          # Wait for service to start
+          sleep 5
+
+          # Health check
+          echo "🏥 Running health check..."
+          if curl -f http://localhost:8000/health; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Health check failed!"
+            exit 1
+          fi
+          EOF
+
+          # Copy and execute deployment script
+          scp -i $SSH_KEY deploy.sh ${{ env.DEPLOY_USER }}@${{ env.DROPLET_IP }}:/tmp/
+          ssh -i $SSH_KEY ${{ env.DEPLOY_USER }}@${{ env.DROPLET_IP }} 'bash /tmp/deploy.sh'
+
+      - name: Verify deployment
+        run: |
+          echo "🏥 Verifying production health..."
+          sleep 10
+          curl -f https://${{ secrets.DOMAIN_NAME }}/health || exit 1
+          echo "✅ Production deployment verified!"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment to production completed successfully"
+          else
+            echo "❌ Deployment failed - check logs"
+          fi
+
+  smoke-test:
+    name: Smoke Tests (Production)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Health check
+        run: |
+          curl -f https://${{ secrets.DOMAIN_NAME }}/health
+          echo "✅ Health check passed"
+
+      - name: API version check
+        run: |
+          VERSION=$(curl -s https://${{ secrets.DOMAIN_NAME }}/health | jq -r '.version')
+          echo "Deployed version: $VERSION"
+
+      - name: Database connectivity check
+        run: |
+          DB_STATUS=$(curl -s https://${{ secrets.DOMAIN_NAME }}/health | jq -r '.checks.database')
+          if [ "$DB_STATUS" != "healthy" ]; then
+            echo "❌ Database check failed"
+            exit 1
+          fi
+          echo "✅ Database connectivity verified"
+
+      - name: Auth endpoint check
+        run: |
+          # Test registration endpoint (should return 422 for invalid data, not 500)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST https://${{ secrets.DOMAIN_NAME }}/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"invalid": "data"}')
+
+          if [ "$HTTP_CODE" == "422" ]; then
+            echo "✅ Auth endpoints responding correctly"
+          else
+            echo "❌ Auth endpoint check failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
