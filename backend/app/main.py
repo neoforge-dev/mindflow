@@ -1,17 +1,17 @@
 """FastAPI application setup with health check and error handling."""
 
-import logging
-
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.logging_config import configure_logging, get_logger
 from app.middleware.rate_limit import setup_rate_limiting
+from app.middleware.request_logging import RequestIDMiddleware
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Setup structured logging
+configure_logging()
+logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -57,8 +57,13 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def general_exception_handler(_request: Request, exc: Exception):
-        # Log full traceback for debugging
-        logger.exception("Unhandled exception", exc_info=exc)
+        # Log full traceback for debugging with structured logging
+        logger.error(
+            "unhandled_exception",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
 
         # Return detailed error in dev, generic in prod
         if settings.debug:
@@ -75,6 +80,9 @@ def create_app() -> FastAPI:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"detail": "Internal server error"},
             )
+
+    # Setup request ID and logging middleware
+    app.add_middleware(RequestIDMiddleware)
 
     # Setup rate limiting
     setup_rate_limiting(app)
