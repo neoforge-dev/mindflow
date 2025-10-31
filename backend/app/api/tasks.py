@@ -2,11 +2,12 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.crud import TaskCRUD
 from app.dependencies import get_current_user_id, get_db
+from app.middleware.rate_limit import limiter
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 
 router = APIRouter()
@@ -16,7 +17,9 @@ router = APIRouter()
 
 
 @router.post("/api/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("60/minute")
 async def create_task(
+    request: Request,  # noqa: ARG001
     task_data: TaskCreate,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -29,8 +32,11 @@ async def create_task(
 
 
 @router.get("/api/tasks/pending", response_model=list[TaskResponse])
+@limiter.limit("60/minute")
 async def get_pending_tasks(
-    user_id: UUID = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)
+    request: Request,  # noqa: ARG001
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get all pending/in-progress tasks (excludes completed and snoozed)."""
     tasks = await TaskCRUD.get_pending_tasks(db, user_id)
@@ -38,7 +44,9 @@ async def get_pending_tasks(
 
 
 @router.get("/api/tasks", response_model=list[TaskResponse])
+@limiter.limit("60/minute")
 async def list_tasks(
+    request: Request,  # noqa: ARG001
     status: str | None = None,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -49,7 +57,9 @@ async def list_tasks(
 
 
 @router.get("/api/tasks/{task_id}", response_model=TaskResponse)
+@limiter.limit("60/minute")
 async def get_task(
+    request: Request,  # noqa: ARG001
     task_id: UUID,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -64,7 +74,9 @@ async def get_task(
 
 
 @router.put("/api/tasks/{task_id}", response_model=TaskResponse)
+@limiter.limit("60/minute")
 async def update_task(
+    request: Request,  # noqa: ARG001
     task_id: UUID,
     task_data: TaskUpdate,
     user_id: UUID = Depends(get_current_user_id),
@@ -80,7 +92,9 @@ async def update_task(
 
 
 @router.delete("/api/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("60/minute")
 async def delete_task(
+    request: Request,  # noqa: ARG001
     task_id: UUID,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.middleware.rate_limit import setup_rate_limiting
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +75,9 @@ def create_app() -> FastAPI:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"detail": "Internal server error"},
             )
+
+    # Setup rate limiting
+    setup_rate_limiting(app)
 
     # Include routers
     from app.api.auth import router as auth_router

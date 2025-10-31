@@ -1,6 +1,6 @@
 """Authentication API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.schemas import Token, UserLogin, UserRegister, UserResponse
@@ -8,12 +8,18 @@ from app.auth.security import create_access_token
 from app.auth.service import AuthService
 from app.db.models import User
 from app.dependencies import get_current_user, get_db
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)) -> UserResponse:
+@limiter.limit("10/minute")
+async def register(
+    request: Request,  # noqa: ARG001
+    user_data: UserRegister,
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
     """
     Register a new user account.
 
@@ -40,7 +46,12 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)) 
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)) -> Token:
+@limiter.limit("10/minute")
+async def login(
+    request: Request,  # noqa: ARG001
+    credentials: UserLogin,
+    db: AsyncSession = Depends(get_db),
+) -> Token:
     """
     Login with email and password.
 
