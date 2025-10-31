@@ -1,0 +1,35 @@
+{
+  "name": "mindflow-landing-page",
+  "version": "1.0.0",
+  "description": "MindFlow landing page - production-ready single HTML file",
+  "private": true,
+  "scripts": {
+    "dev": "python3 -m http.server 8000",
+    "dev:node": "npx http-server -p 8000 -c-1",
+    "dev:live": "npx live-server --port=8000 --no-browser",
+    "test": "playwright test tests/frontend/landing-page.spec.js",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "lighthouse": "lighthouse http://localhost:8000 --view",
+    "lighthouse:ci": "lighthouse http://localhost:8000 --output json --output-path ./lighthouse-report.json",
+    "deploy:cloudflare": "wrangler pages publish . --project-name=mindflow",
+    "deploy:vercel": "vercel --prod",
+    "deploy:netlify": "netlify deploy --prod --dir=."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "http-server": "^14.1.1",
+    "lighthouse": "^11.4.0",
+    "live-server": "^1.2.2"
+  },
+  "keywords": [
+    "landing-page",
+    "task-manager",
+    "ai",
+    "chatgpt",
+    "productivity"
+  ],
+  "author": "MindFlow",
+  "license": "MIT"
+}
