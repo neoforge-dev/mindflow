@@ -2,6 +2,7 @@
 
 import os
 
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -25,14 +26,15 @@ class Settings(BaseSettings):
     # Monitoring
     sentry_dsn: str | None = os.getenv("SENTRY_DSN", None)
 
+    model_config = ConfigDict(
+        env_file=".env",
+        extra="ignore",  # Ignore extra fields from .env
+    )
+
     @property
     def is_testing(self) -> bool:
         """Check if running in test environment."""
         return self.environment == "testing"
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"  # Ignore extra fields from .env
 
 
 settings = Settings()

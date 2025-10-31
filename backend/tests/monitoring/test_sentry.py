@@ -1,8 +1,6 @@
 """Tests for Sentry error monitoring integration."""
 
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from app.config import Settings
 from app.monitoring.sentry import init_sentry

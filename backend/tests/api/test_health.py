@@ -1,9 +1,8 @@
 """Health check endpoint tests."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-from sqlalchemy import text
 
 
 @pytest.mark.asyncio
