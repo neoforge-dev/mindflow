@@ -1,10 +1,10 @@
 """SQLAlchemy database models."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -107,4 +107,56 @@ class AuditLog(Base):
     __table_args__ = (
         Index("idx_audit_user_timestamp", "user_id", "timestamp"),
         Index("idx_audit_action", "action"),
+    )
+
+
+class PasswordResetToken(Base):
+    """Password reset tokens for secure password recovery flow."""
+
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(String(255), nullable=False)  # bcrypt hash of token
+    expires_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.utcnow() + timedelta(hours=1)
+    )
+    used_at = Column(DateTime)  # Nullable, marks when token was used
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Index for efficient token lookups
+    __table_args__ = (
+        Index(
+            "idx_password_reset_expires",
+            "expires_at",
+            postgresql_where=Column("used_at").is_(None),
+        ),
+    )
+
+
+class RefreshToken(Base):
+    """Refresh tokens for 30-day session management."""
+
+    __tablename__ = "refresh_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(String(255), unique=True, nullable=False)  # bcrypt hash of token
+    expires_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.utcnow() + timedelta(days=30)
+    )
+    revoked_at = Column(DateTime)  # Nullable, marks when token was revoked
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    user_agent = Column(String(500))  # For security tracking
+    ip_address = Column(INET)  # For security tracking
+
+    # Indexes for efficient lookups
+    __table_args__ = (
+        Index(
+            "idx_refresh_user_active",
+            "user_id",
+            "expires_at",
+            postgresql_where=Column("revoked_at").is_(None),
+        ),
     )

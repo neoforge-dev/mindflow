@@ -17,6 +17,10 @@ from alembic import context
 from app.config import settings
 from app.db.database import Base
 
+# Import all models to ensure they're registered with Base.metadata
+# This is required for Alembic autogenerate to detect schema changes
+from app.db import models  # noqa: F401
+
 # This is the Alembic Config object
 config = context.config
 

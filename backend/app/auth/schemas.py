@@ -50,3 +50,35 @@ class UserResponse(BaseModel):
     created_at: datetime = Field(..., description="Account creation timestamp")
 
     model_config = ConfigDict(from_attributes=True)  # Enable ORM mode for SQLAlchemy models
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request to initiate password reset flow."""
+
+    email: EmailStr = Field(..., description="Email address of account to reset")
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request to reset password with token."""
+
+    token: str = Field(..., min_length=32, description="Password reset token from email")
+    new_password: str = Field(
+        ...,
+        min_length=12,
+        max_length=128,
+        description="New password (12-128 characters, NIST 2024 standard)",
+    )
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request to refresh access token."""
+
+    refresh_token: str = Field(..., description="Refresh token from login")
+
+
+class TokensResponse(BaseModel):
+    """Response with both access and refresh tokens."""
+
+    access_token: str = Field(..., description="JWT access token (24 hours)")
+    refresh_token: str = Field(..., description="Refresh token (30 days)")
+    token_type: str = Field(default="bearer", description="Token type (always 'bearer')")
