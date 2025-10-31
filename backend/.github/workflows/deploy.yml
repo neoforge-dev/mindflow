@@ -1,0 +1,315 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (emergency deployment only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mindflow_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/pyproject.toml', 'backend/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Run linter (ruff)
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Run type checker (mypy)
+        working-directory: backend
+        run: uv run mypy app || true  # Don't fail on type errors (for now)
+
+      - name: Run tests with coverage
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/mindflow_test
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/mindflow_test
+          SECRET_KEY: test-secret-key-for-ci-only
+          ENVIRONMENT: testing
+        run: |
+          uv run pytest --cov --cov-report=term-missing --cov-report=xml -v
+
+      - name: Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@v3
+        if: false  # Enable by changing to true and adding CODECOV_TOKEN secret
+        with:
+          files: ./backend/coverage.xml
+          fail_ci_if_error: false
+
+      - name: Test database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/mindflow_test
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+
+  deploy:
+    name: Deploy to DigitalOcean
+    needs: test
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.mindflow.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: deploy
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 10m
+          script: |
+            set -e
+
+            echo "========================================="
+            echo "MindFlow Deployment Started"
+            echo "========================================="
+            echo "Timestamp: $(date)"
+            echo "User: $(whoami)"
+            echo "Host: $(hostname)"
+            echo ""
+
+            cd /opt/mindflow
+
+            # Backup current version
+            LAST_COMMIT=$(git rev-parse HEAD)
+            echo $LAST_COMMIT > .last-deploy
+            echo "Current version: $LAST_COMMIT"
+            echo ""
+
+            # Pull new code
+            echo "Fetching latest code from GitHub..."
+            git fetch origin main
+            git reset --hard origin/main
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "New version: $NEW_COMMIT"
+            echo ""
+
+            # Check if update needed
+            if [ "$LAST_COMMIT" == "$NEW_COMMIT" ]; then
+                echo "No changes detected, deployment cancelled"
+                exit 0
+            fi
+
+            # Show changes
+            echo "Changes in this deployment:"
+            git log --oneline $LAST_COMMIT..$NEW_COMMIT
+            echo ""
+
+            # Install/update dependencies
+            echo "Installing dependencies..."
+            cd backend
+            /home/deploy/.cargo/bin/uv sync --frozen
+            echo ""
+
+            # Backup database (optional but recommended)
+            echo "Creating database backup..."
+            BACKUP_FILE="/opt/backups/mindflow/db_backup_$(date +%Y%m%d_%H%M%S).sql"
+            pg_dump -U mindflow_app mindflow_prod > "$BACKUP_FILE" 2>/dev/null || echo "Database backup skipped"
+            echo ""
+
+            # Run database migrations
+            echo "Running database migrations..."
+            if ! /home/deploy/.cargo/bin/uv run alembic upgrade head; then
+                echo "❌ Migration failed, rolling back deployment..."
+                cd /opt/mindflow
+                git reset --hard $LAST_COMMIT
+
+                # Attempt to restore database backup
+                if [ -f "$BACKUP_FILE" ]; then
+                    echo "Restoring database from backup..."
+                    psql -U mindflow_app mindflow_prod < "$BACKUP_FILE" 2>/dev/null || echo "Database restore failed"
+                fi
+
+                echo "Deployment rolled back to $LAST_COMMIT"
+                exit 1
+            fi
+            echo ""
+
+            # Restart service
+            echo "Restarting application service..."
+            sudo systemctl restart mindflow
+            echo ""
+
+            # Wait for service to start
+            echo "Waiting for service to start..."
+            sleep 10
+
+            # Health check with retries
+            echo "Running health checks..."
+            HEALTH_URL="http://localhost:8000/health"
+            MAX_RETRIES=6
+            RETRY_DELAY=5
+
+            for i in $(seq 1 $MAX_RETRIES); do
+                echo "Health check attempt $i/$MAX_RETRIES..."
+
+                if curl -f -s --max-time 10 "$HEALTH_URL" > /tmp/health_response.txt; then
+                    echo "✅ Health check passed"
+                    cat /tmp/health_response.txt
+                    rm -f /tmp/health_response.txt
+                    break
+                else
+                    echo "Health check failed"
+
+                    if [ $i -eq $MAX_RETRIES ]; then
+                        echo "❌ Health check failed after $MAX_RETRIES attempts, rolling back..."
+
+                        # Rollback git
+                        cd /opt/mindflow
+                        git reset --hard $LAST_COMMIT
+
+                        # Rollback database
+                        echo "Rolling back database migration..."
+                        cd backend
+                        /home/deploy/.cargo/bin/uv run alembic downgrade -1 || echo "Database rollback failed"
+
+                        # Restore database backup if available
+                        if [ -f "$BACKUP_FILE" ]; then
+                            echo "Restoring database from backup..."
+                            psql -U mindflow_app mindflow_prod < "$BACKUP_FILE" 2>/dev/null || echo "Database restore failed"
+                        fi
+
+                        # Restart service with old code
+                        sudo systemctl restart mindflow
+                        sleep 5
+
+                        # Final health check on old version
+                        if curl -f -s --max-time 10 "$HEALTH_URL" > /dev/null; then
+                            echo "Service rolled back successfully to $LAST_COMMIT"
+                        else
+                            echo "❌ CRITICAL: Rollback failed, manual intervention required!"
+                        fi
+
+                        exit 1
+                    fi
+
+                    echo "Waiting $RETRY_DELAY seconds before retry..."
+                    sleep $RETRY_DELAY
+                fi
+            done
+            echo ""
+
+            # Additional verification checks
+            echo "Running post-deployment verification..."
+
+            # Check service status
+            if ! systemctl is-active --quiet mindflow; then
+                echo "❌ Service is not running"
+                exit 1
+            fi
+            echo "✅ Service is running"
+
+            # Check if port is listening
+            if ! ss -tlnp | grep -q ":8000"; then
+                echo "❌ Port 8000 is not listening"
+                exit 1
+            fi
+            echo "✅ Port 8000 is listening"
+
+            # Check database connection
+            if PGPASSWORD="$DATABASE_PASSWORD" psql -U mindflow_app -d mindflow_prod -c "SELECT 1;" > /dev/null 2>&1; then
+                echo "✅ Database connection successful"
+            else
+                echo "⚠️  Database connection check skipped"
+            fi
+
+            echo ""
+            echo "========================================="
+            echo "✅ Deployment Successful"
+            echo "========================================="
+            echo "Version: $NEW_COMMIT"
+            echo "Deployed at: $(date)"
+            echo "Service status: $(systemctl is-active mindflow)"
+            echo ""
+
+            # Show recent logs
+            echo "Recent application logs:"
+            journalctl -u mindflow --since "1 minute ago" --no-pager | tail -20
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful"
+          else
+            echo "❌ Deployment failed"
+          fi
+
+  notify:
+    name: Send Notifications
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deployment Success Notification
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ Deployment to production was successful"
+          # Add notification integrations here (Slack, Discord, email, etc.)
+
+      - name: Deployment Failure Notification
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ Deployment to production failed"
+          # Add notification integrations here (Slack, Discord, email, etc.)
