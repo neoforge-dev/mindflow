@@ -3,7 +3,10 @@
 Implements in-memory rate limiting for API endpoints:
 - Task endpoints: 60 requests per minute
 - Auth endpoints: 10 requests per minute
+- Disabled in testing environment
 """
+
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -36,10 +39,13 @@ def get_remote_address_safe(request: Request) -> str:
 
 
 # Create global limiter instance
+# Disable rate limiting in testing environment to avoid test interference
+_is_testing = os.getenv("ENVIRONMENT") == "testing"
 limiter = Limiter(
     key_func=get_remote_address_safe,
-    default_limits=["100/minute"],  # Global default
+    default_limits=["100/minute"],
     storage_uri="memory://",  # In-memory storage (no Redis)
+    enabled=not _is_testing,  # Disable completely in testing
 )
 
 

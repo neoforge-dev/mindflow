@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     environment: str = os.getenv("ENVIRONMENT", "development")
     debug: bool = environment == "development"
 
+    @property
+    def is_testing(self) -> bool:
+        """Check if running in test environment."""
+        return self.environment == "testing"
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # Ignore extra fields from .env

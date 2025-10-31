@@ -1,6 +1,10 @@
 """Pytest fixtures for database testing."""
 
+# Set testing environment BEFORE any app imports
 import os
+
+os.environ["ENVIRONMENT"] = "testing"
+
 import uuid
 
 import pytest_asyncio
