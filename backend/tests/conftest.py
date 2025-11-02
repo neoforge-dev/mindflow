@@ -20,21 +20,32 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db_engine():
-    """Create test database engine with proper cleanup."""
+@pytest_asyncio.fixture(scope="session")
+async def db_tables():
+    """Create database tables once per test session."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
     # Create all tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    yield engine
+    yield
 
-    # Drop all tables (clean slate for next test run)
+    # Drop all tables at end of session
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def db_engine(db_tables):
+    """Create test database engine with proper cleanup."""
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
+    yield engine
+
+    # Dispose engine after each test
     await engine.dispose()
 
 
@@ -123,11 +134,12 @@ async def test_client(db_engine):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        yield client
-
-    # Clean up
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            yield client
+    finally:
+        # Clean up - ensure this always runs
+        app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture

@@ -95,12 +95,14 @@ def create_app() -> FastAPI:
     from app.api.tasks import router as tasks_router
     from app.oauth.discovery import router as oauth_discovery_router
     from app.oauth.jwks import router as jwks_router
+    from app.oauth.register import router as oauth_register_router
 
     app.include_router(auth_router)
     app.include_router(health_router)
     app.include_router(tasks_router)
     app.include_router(oauth_discovery_router)
     app.include_router(jwks_router)
+    app.include_router(oauth_register_router)
 
     return app
 

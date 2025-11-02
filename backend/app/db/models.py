@@ -160,3 +160,6 @@ class RefreshToken(Base):
             postgresql_where=Column("revoked_at").is_(None),
         ),
     )
+
+# Import OAuth models for Alembic autogenerate
+from app.oauth.models import OAuthClient, OAuthAuthorizationCode, OAuthRefreshToken  # noqa: F401
