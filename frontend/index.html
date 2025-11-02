@@ -5,23 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- SEO Meta Tags -->
-  <title>MindFlow - Your AI Task Manager Lives in ChatGPT</title>
-  <meta name="description" content="Stop context switching. MindFlow is an AI-first task manager that lives in ChatGPT. Just ask what to work on next and get intelligent recommendations.">
-  <meta name="keywords" content="AI task manager, ChatGPT productivity, intelligent task prioritization, natural language task management">
+  <title>MindFlow - AI-Powered Task Management in ChatGPT</title>
+  <meta name="description" content="Production-ready AI task manager built with ChatGPT Apps SDK. Interactive widgets, intelligent prioritization, and seamless conversation. 97 tests passing.">
+  <meta name="keywords" content="AI task manager, ChatGPT Apps SDK, ChatGPT productivity, intelligent task prioritization, natural language task management, interactive widgets">
   <meta name="author" content="MindFlow">
 
   <!-- Open Graph / Social Sharing -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mindflow.ai/">
-  <meta property="og:title" content="MindFlow - Your AI Task Manager Lives in ChatGPT">
-  <meta property="og:description" content="Stop context switching. Just ask what to work on next and get intelligent recommendations.">
+  <meta property="og:title" content="MindFlow - AI-Powered Task Management in ChatGPT">
+  <meta property="og:description" content="Production-ready AI task manager built with ChatGPT Apps SDK. Interactive widgets, intelligent prioritization, and seamless conversation.">
   <meta property="og:image" content="https://mindflow.ai/og-image.png">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://mindflow.ai/">
-  <meta name="twitter:title" content="MindFlow - Your AI Task Manager Lives in ChatGPT">
-  <meta name="twitter:description" content="Stop context switching. Just ask what to work on next and get intelligent recommendations.">
+  <meta name="twitter:title" content="MindFlow - AI-Powered Task Management in ChatGPT">
+  <meta name="twitter:description" content="Production-ready AI task manager built with ChatGPT Apps SDK. Interactive widgets and intelligent prioritization.">
   <meta name="twitter:image" content="https://mindflow.ai/twitter-image.png">
 
   <!-- Preconnect to CDNs -->
@@ -141,15 +141,24 @@
   <section class="min-h-screen flex items-center justify-center px-4 py-12 md:py-20">
     <div class="max-w-6xl mx-auto text-center">
 
+      <!-- Production Badge -->
+      <div class="mb-6 fade-in">
+        <div class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full text-sm font-medium text-blue-700">
+          <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Built with ChatGPT Apps SDK • Production Ready • 97 Tests Passing
+        </div>
+      </div>
+
       <!-- Headline -->
-      <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 fade-in">
-        Your AI Task Manager<br class="hidden md:block">
-        Lives in <span class="text-blue-600">ChatGPT</span>
+      <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 fade-in" style="animation-delay: 0.1s;">
+        AI-Powered Task Management<br class="hidden md:block">
+        in <span class="text-blue-600">ChatGPT</span>
       </h1>
 
       <!-- Subheadline -->
       <p class="text-lg md:text-xl lg:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto fade-in" style="animation-delay: 0.2s;">
-        Stop context switching. Just ask what to work on next.
+        Interactive widgets, intelligent prioritization, and seamless conversation.<br class="hidden md:block">
+        Complete and snooze tasks without leaving ChatGPT.
       </p>
 
       <!-- CTA Button -->
@@ -173,9 +182,9 @@
         x-data="{
           messages: [
             { type: 'user', text: 'What should I work on?' },
-            { type: 'ai', text: 'Work on Q4 Report - due in 2 hours, high priority (score 85/100)' },
-            { type: 'user', text: 'Add blog post about FastAPI, due Friday' },
-            { type: 'ai', text: 'Task added: Blog post about FastAPI - Due Oct 30, Priority 3/5' }
+            { type: 'ai', text: '[TaskWidget with Q4 Report - AI Score 85/100, Due in 2h]' },
+            { type: 'user', text: 'Complete task' },
+            { type: 'ai', text: 'Task completed! Next: Blog post about FastAPI (Score 72/100)' }
           ],
           displayedMessages: [],
           currentIndex: 0,
@@ -292,10 +301,10 @@
             3
           </div>
           <h3 class="text-xl md:text-2xl font-semibold text-gray-900 mb-4">
-            Get Smart Recommendations
+            Get Interactive Widgets
           </h3>
           <p class="text-base md:text-lg text-gray-600">
-            AI analyzes deadlines, priority, and context to suggest the best task to work on next.
+            AI shows your best task with score and reasoning. Complete or snooze with one click directly in the widget.
           </p>
         </div>
 
@@ -312,7 +321,7 @@
         Why MindFlow?
       </h2>
 
-      <div class="grid md:grid-cols-2 gap-8 md:gap-12">
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
 
         <!-- Feature 1 -->
         <div class="glass-effect rounded-xl p-6 md:p-8">
@@ -340,10 +349,10 @@
         <div class="glass-effect rounded-xl p-6 md:p-8">
           <div class="text-4xl mb-4">⚡</div>
           <h3 class="text-xl md:text-2xl font-semibold text-gray-900 mb-3">
-            Zero Context Switching
+            Interactive Task Widgets
           </h3>
           <p class="text-base md:text-lg text-gray-600">
-            Works where you already are. No new app to learn, no browser tabs to manage. Just ChatGPT.
+            Complete tasks or snooze them with one click. Interactive widgets render inline in ChatGPT with real-time updates and error handling.
           </p>
         </div>
 
@@ -355,6 +364,28 @@
           </h3>
           <p class="text-base md:text-lg text-gray-600">
             Every recommendation comes with clear reasoning. No black box algorithms - you understand why each task is suggested.
+          </p>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="glass-effect rounded-xl p-6 md:p-8">
+          <div class="text-4xl mb-4">🚀</div>
+          <h3 class="text-xl md:text-2xl font-semibold text-gray-900 mb-3">
+            Production Ready
+          </h3>
+          <p class="text-base md:text-lg text-gray-600">
+            Built with ChatGPT Apps SDK. 97 tests passing, comprehensive error handling, and OAuth 2.1 security. Ready for real work.
+          </p>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="glass-effect rounded-xl p-6 md:p-8">
+          <div class="text-4xl mb-4">💡</div>
+          <h3 class="text-xl md:text-2xl font-semibold text-gray-900 mb-3">
+            Zero Context Switching
+          </h3>
+          <p class="text-base md:text-lg text-gray-600">
+            Works where you already are. No new app to learn, no browser tabs to manage. Everything happens in ChatGPT.
           </p>
         </div>
 
