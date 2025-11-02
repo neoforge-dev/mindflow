@@ -5,7 +5,7 @@
  * No props, no fallbacks - ChatGPT only.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { Component, useMemo, useState } from 'react';
 import { getSDK } from '../sdk/AppsSDK';
 
 interface Task {
@@ -44,7 +44,103 @@ const PRIORITY_LABELS: Record<number, string> = {
   5: 'Urgent',
 };
 
-export const TaskWidget: React.FC = () => {
+/**
+ * Error Boundary for TaskWidget
+ * Catches rendering errors and displays friendly error message
+ */
+class TaskWidgetErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('TaskWidget Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const sdk = getSDK();
+      const isDark = sdk.theme === 'dark';
+      const colors = {
+        bg: isDark ? '#1a1a1a' : '#ffffff',
+        text: isDark ? '#ffffff' : '#000000',
+        textSecondary: isDark ? '#b0b0b0' : '#666666',
+        border: isDark ? '#404040' : '#e0e0e0',
+        error: isDark ? '#ff6b6b' : '#d32f2f',
+        errorBg: isDark ? 'rgba(255, 107, 107, 0.1)' : 'rgba(211, 47, 47, 0.05)',
+      };
+
+      return (
+        <div
+          style={{
+            fontFamily:
+              "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+            backgroundColor: colors.bg,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '8px',
+            padding: '16px',
+            maxWidth: '600px',
+            width: '100%',
+          }}
+        >
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: colors.errorBg,
+              borderRadius: '6px',
+              border: `1px solid ${colors.error}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: colors.error,
+                marginBottom: '8px',
+              }}
+            >
+              ⚠️ Error Loading Task
+            </div>
+            <p
+              style={{
+                fontSize: '14px',
+                color: colors.text,
+                lineHeight: 1.5,
+                margin: '0',
+              }}
+            >
+              Failed to render task widget. Please try refreshing or contact support.
+            </p>
+            {this.state.error && (
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: colors.textSecondary,
+                  marginTop: '8px',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {this.state.error.message}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const TaskWidgetContent: React.FC = () => {
   const sdk = getSDK();
   const theme = sdk.theme;
   const isDark = theme === 'dark';
@@ -54,14 +150,17 @@ export const TaskWidget: React.FC = () => {
     return sdk.getToolOutput<TaskOutput>();
   }, []);
 
-  // State for button loading
+  // State for button loading and errors
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSnoozing, setIsSnoozing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Handle complete task
   const handleComplete = async () => {
     try {
       setIsCompleting(true);
+      setActionError(null); // Clear previous errors
+
       await sdk.callTool({
         name: 'complete_task',
         arguments: { task_id: task.id },
@@ -73,6 +172,11 @@ export const TaskWidget: React.FC = () => {
       });
     } catch (error) {
       console.error('Failed to complete task:', error);
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to complete task. Please try again.'
+      );
     } finally {
       setIsCompleting(false);
     }
@@ -82,6 +186,8 @@ export const TaskWidget: React.FC = () => {
   const handleSnooze = async (hours: number) => {
     try {
       setIsSnoozing(true);
+      setActionError(null); // Clear previous errors
+
       await sdk.callTool({
         name: 'snooze_task',
         arguments: { task_id: task.id, hours },
@@ -93,6 +199,11 @@ export const TaskWidget: React.FC = () => {
       });
     } catch (error) {
       console.error('Failed to snooze task:', error);
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to snooze task. Please try again.'
+      );
     } finally {
       setIsSnoozing(false);
     }
@@ -380,6 +491,68 @@ export const TaskWidget: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Alert */}
+      {actionError && (
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '12px',
+            backgroundColor: isDark
+              ? 'rgba(255, 107, 107, 0.1)'
+              : 'rgba(211, 47, 47, 0.05)',
+            borderRadius: '6px',
+            border: `1px solid ${isDark ? '#ff6b6b' : '#d32f2f'}`,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: isDark ? '#ff6b6b' : '#d32f2f',
+                  marginBottom: '4px',
+                }}
+              >
+                Action Failed
+              </div>
+              <p
+                style={{
+                  fontSize: '13px',
+                  color: colors.text,
+                  lineHeight: 1.5,
+                  margin: '0',
+                }}
+              >
+                {actionError}
+              </p>
+            </div>
+            <button
+              onClick={() => setActionError(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textSecondary,
+                cursor: 'pointer',
+                padding: '0',
+                fontSize: '18px',
+                lineHeight: 1,
+              }}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div
         style={{
@@ -432,5 +605,17 @@ export const TaskWidget: React.FC = () => {
         </button>
       </div>
     </div>
+  );
+};
+
+/**
+ * TaskWidget with Error Boundary
+ * Wraps the main component with error handling
+ */
+export const TaskWidget: React.FC = () => {
+  return (
+    <TaskWidgetErrorBoundary>
+      <TaskWidgetContent />
+    </TaskWidgetErrorBoundary>
   );
 };
