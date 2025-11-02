@@ -31,9 +31,10 @@ The MindFlow backend is **production-ready** and can be deployed immediately.
 **Time Required**: 90 minutes (first deployment)
 
 **Steps**:
-1. Follow the deployment guide: `docs/DEPLOYMENT-GUIDE.md`
-2. Or use quick start: `backend/DEPLOYMENT-SUMMARY.md`
-3. Automated deployment via CI/CD after initial setup
+1. Review deployment summary: `backend/DEPLOYMENT-SUMMARY.md`
+2. Follow operations guide: `deployment/README.md`
+3. Use deployment scripts in `deployment/` directory
+4. Automated deployment via CI/CD after initial setup
 
 **Monthly Cost**: $13-14/month
 - DigitalOcean 2GB droplet: $12/month
