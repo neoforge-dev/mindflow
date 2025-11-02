@@ -63,3 +63,40 @@ class OAuthClientInfoResponse(BaseModel):
     created_at: str
 
     model_config = {"from_attributes": True}
+
+
+class AuthorizationRequest(BaseModel):
+    """OAuth 2.1 Authorization Request (RFC 6749 Section 4.1.1)."""
+
+    client_id: str = Field(..., description="OAuth client identifier", min_length=1)
+    redirect_uri: str = Field(
+        ..., description="Redirect URI for authorization response", min_length=1
+    )
+    response_type: str = Field(..., description="Must be 'code' for authorization code flow")
+    scope: str = Field(..., description="Space-separated list of requested scopes", min_length=1)
+    state: str = Field(..., description="Opaque state value for CSRF protection", min_length=1)
+
+    # PKCE parameters (RFC 7636)
+    code_challenge: str = Field(
+        ..., description="PKCE code challenge", min_length=43, max_length=128
+    )
+    code_challenge_method: str = Field(
+        ..., description="PKCE challenge method (must be S256)", pattern="^S256$"
+    )
+
+
+class ConsentDecision(BaseModel):
+    """User's consent decision for authorization request."""
+
+    client_id: str = Field(..., min_length=1)
+    redirect_uri: str = Field(..., min_length=1)
+    scope: str = Field(..., min_length=1)
+    state: str = Field(..., min_length=1)
+    code_challenge: str = Field(..., min_length=43, max_length=128)
+    code_challenge_method: str = Field(..., pattern="^S256$")
+
+    # User decision
+    approve: bool = Field(..., description="True if user approved, False if denied")
+
+    # CSRF protection
+    csrf_token: str = Field(..., description="CSRF token for form validation", min_length=1)

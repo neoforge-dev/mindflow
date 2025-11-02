@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authorization Request - MindFlow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .client-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            object-fit: cover;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .client-name {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .scope-list {
+            list-style: none;
+        }
+
+        .scope-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .scope-item::before {
+            content: "✓";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            text-align: center;
+            line-height: 20px;
+            margin-right: 12px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #856404;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-approve {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-deny {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .btn-deny:hover {
+            background: #dee2e6;
+            transform: translateY(-2px);
+        }
+
+        .security-info {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+        }
+
+        .security-info a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .security-info a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if client_logo %}
+            <img src="{{ client_logo }}" alt="{{ client_name }}" class="client-logo">
+            {% endif %}
+            <h1>Authorization Request</h1>
+            <p class="subtitle">
+                <span class="client-name">{{ client_name }}</span> is requesting access to your MindFlow account
+            </p>
+        </div>
+
+        <div class="info-box">
+            <div class="info-title">This application will be able to:</div>
+            <ul class="scope-list">
+                {% for scope, description in scope_descriptions.items() %}
+                <li class="scope-item">{{ description }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="warning">
+            <strong>Important:</strong> Only approve if you trust this application. You can revoke access at any time from your account settings.
+        </div>
+
+        <form method="POST" action="/oauth/authorize">
+            <input type="hidden" name="client_id" value="{{ client_id }}">
+            <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+            <input type="hidden" name="scope" value="{{ scope }}">
+            <input type="hidden" name="state" value="{{ state }}">
+            <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+            <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="button-group">
+                <button type="submit" name="approve" value="false" class="btn-deny">
+                    Deny
+                </button>
+                <button type="submit" name="approve" value="true" class="btn-approve">
+                    Approve
+                </button>
+            </div>
+        </form>
+
+        <div class="security-info">
+            Protected by OAuth 2.1 with PKCE security.<br>
+            <a href="#">Learn more about authorization</a>
+        </div>
+    </div>
+</body>
+</html>
