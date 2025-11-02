@@ -1,8 +1,9 @@
 # MindFlow: Deployment Guide
 
-**Last Updated**: 2025-10-30
+**Last Updated**: 2025-11-02
 **Target**: $10 DigitalOcean Droplet + Cloudflare Pages
-**Stack**: Docker + FastAPI + PostgreSQL
+**Stack**: Docker + FastAPI + PostgreSQL + ChatGPT Apps SDK
+**Status**: Production Ready for Open Beta (256 tests passing, 80.63% coverage)
 
 ---
 
@@ -10,13 +11,16 @@
 
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
-3. [Docker Setup](#docker-setup)
-4. [DigitalOcean Droplet Setup](#digitalocean-droplet-setup)
-5. [Cloudflare Pages Setup](#cloudflare-pages-setup)
-6. [Database Migration](#database-migration)
-7. [Environment Configuration](#environment-configuration)
-8. [Monitoring & Logging](#monitoring--logging)
-9. [Troubleshooting](#troubleshooting)
+3. [OAuth 2.1 & Security Setup](#oauth-21--security-setup)
+4. [Docker Setup](#docker-setup)
+5. [DigitalOcean Droplet Setup](#digitalocean-droplet-setup)
+6. [MCP Server Configuration](#mcp-server-configuration)
+7. [ChatGPT Apps SDK Integration](#chatgpt-apps-sdk-integration)
+8. [Database Migration](#database-migration)
+9. [Environment Configuration](#environment-configuration)
+10. [Open Beta Launch Checklist](#open-beta-launch-checklist)
+11. [Monitoring & Logging](#monitoring--logging)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -107,6 +111,149 @@ sudo mv doctl /usr/local/bin
 
 # Verify
 doctl version
+```
+
+---
+
+## OAuth 2.1 & Security Setup
+
+### Step 1: Generate RS256 Key Pair
+
+**On your local machine**:
+
+```bash
+# Generate private key (RS256)
+openssl genrsa -out oauth_private_key.pem 2048
+
+# Generate public key
+openssl rsa -in oauth_private_key.pem -pubout -out oauth_public_key.pem
+
+# View keys
+cat oauth_private_key.pem
+cat oauth_public_key.pem
+```
+
+**Security Notes**:
+- **NEVER** commit private keys to git
+- Store private key in `.env` file on server
+- Public key can be exposed via `/oauth/jwks` endpoint
+- Rotate keys every 90 days
+
+### Step 2: OAuth Client Registration
+
+For open beta, you'll need to register OAuth clients for:
+1. ChatGPT Apps SDK integration
+2. External service integrations (if any)
+
+**Create OAuth client** (via API or database):
+
+```sql
+-- Connect to database
+docker-compose -f docker-compose.prod.yml exec postgres psql -U mindflow -d mindflow
+
+-- Create OAuth client for ChatGPT
+INSERT INTO oauth_clients (
+    id,
+    client_id,
+    client_name,
+    client_secret_hash,
+    redirect_uris,
+    grant_types,
+    scope,
+    created_at
+) VALUES (
+    gen_random_uuid(),
+    'chatgpt_mindflow',
+    'ChatGPT MindFlow Integration',
+    '<bcrypt-hash-of-client-secret>',
+    ARRAY['https://chat.openai.com/aip/oauth/callback'],
+    ARRAY['authorization_code', 'refresh_token'],
+    'read write',
+    NOW()
+);
+```
+
+### Step 3: PKCE Configuration
+
+PKCE (Proof Key for Code Exchange) is **required** for OAuth 2.1:
+
+**Verify configuration** in `backend/app/oauth/authorize.py`:
+- ✅ `code_challenge` parameter required
+- ✅ `code_challenge_method` set to `S256`
+- ✅ Code verifier validation on token exchange
+
+**Test PKCE flow**:
+```bash
+# Generate code verifier
+CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-43)
+
+# Generate code challenge (SHA256)
+CODE_CHALLENGE=$(echo -n "$CODE_VERIFIER" | openssl dgst -binary -sha256 | openssl base64 | tr -d '=+/' | cut -c1-43)
+
+# Authorization request
+curl "https://api.yourdomain.com/oauth/authorize?client_id=chatgpt_mindflow&response_type=code&redirect_uri=https://chat.openai.com/aip/oauth/callback&code_challenge=$CODE_CHALLENGE&code_challenge_method=S256"
+```
+
+### Step 4: JWT Configuration
+
+**Update `.env` on server**:
+```bash
+# OAuth 2.1 RS256 Keys
+OAUTH_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n<multiline-key>\n-----END RSA PRIVATE KEY-----"
+OAUTH_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n<multiline-key>\n-----END PUBLIC KEY-----"
+
+# JWT Settings
+JWT_ALGORITHM=RS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_DAYS=30
+
+# Token Rotation
+REFRESH_TOKEN_ROTATION_ENABLED=true
+```
+
+### Step 5: Security Hardening
+
+**Rate Limiting**:
+```bash
+# Update Caddyfile
+nano ~/app/Caddyfile
+
+# Add rate limiting per endpoint
+api.yourdomain.com {
+    reverse_proxy api:8000
+
+    # OAuth endpoints (more permissive)
+    rate_limit /oauth/* {
+        zone oauth {
+            key {remote_host}
+            events 10
+            window 1m
+        }
+    }
+
+    # API endpoints (stricter)
+    rate_limit /api/* {
+        zone api {
+            key {header.Authorization}
+            events 100
+            window 1m
+        }
+    }
+}
+```
+
+**CORS Configuration** (verify in `backend/app/main.py`):
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://chat.openai.com",
+        "https://yourdomain.com"
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 ```
 
 ---
@@ -687,6 +834,406 @@ crontab -e
 # Add this line (daily at 2 AM)
 0 2 * * * /home/mindflow/backup.sh >> /home/mindflow/backup.log 2>&1
 ```
+
+---
+
+## MCP Server Configuration
+
+### What is MCP?
+
+Model Context Protocol (MCP) is the interface that allows ChatGPT to interact with MindFlow. It exposes tools that ChatGPT can call.
+
+### Step 1: Verify MCP Server Deployment
+
+The MCP server is integrated into the FastAPI backend. Verify it's running:
+
+```bash
+# Test MCP tools endpoint
+curl https://api.yourdomain.com/mcp/tools
+
+# Expected response: List of available tools
+# - get_tasks
+# - create_task
+# - update_task
+# - complete_task
+# - snooze_task
+```
+
+### Step 2: MCP Server Environment Variables
+
+**Add to `.env` on server**:
+```bash
+# MCP Configuration
+MCP_SERVER_NAME="MindFlow Task Manager"
+MCP_SERVER_VERSION="1.0.0"
+MCP_SERVER_DESCRIPTION="AI-powered task management with intelligent prioritization"
+
+# MCP Tools Configuration
+MCP_ENABLE_TASK_WIDGETS=true
+MCP_MAX_TASKS_PER_REQUEST=50
+```
+
+### Step 3: Test MCP Tools
+
+**Test each MCP tool**:
+
+```bash
+# Get tasks
+curl -X POST https://api.yourdomain.com/mcp/tools/get_tasks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "pending"}'
+
+# Create task
+curl -X POST https://api.yourdomain.com/mcp/tools/create_task \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test task", "priority": 3}'
+
+# Complete task
+curl -X POST https://api.yourdomain.com/mcp/tools/complete_task \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": "uuid-here"}'
+```
+
+---
+
+## ChatGPT Apps SDK Integration
+
+### Step 1: Register MindFlow with OpenAI
+
+1. **Go to** https://platform.openai.com/apps
+2. **Click** "Create App"
+3. **Fill in details**:
+   - Name: MindFlow Task Manager
+   - Description: AI-powered task management with intelligent prioritization
+   - Category: Productivity
+   - Website: https://yourdomain.com
+
+### Step 2: Configure OAuth 2.1
+
+In the OpenAI Apps dashboard:
+
+1. **OAuth Configuration**:
+   ```
+   Authorization URL: https://api.yourdomain.com/oauth/authorize
+   Token URL: https://api.yourdomain.com/oauth/token
+   Client ID: chatgpt_mindflow
+   Client Secret: <from-oauth-client-registration>
+   Scope: read write
+   ```
+
+2. **Redirect URIs**:
+   ```
+   https://chat.openai.com/aip/oauth/callback
+   ```
+
+3. **PKCE**: Enable (required for OAuth 2.1)
+
+### Step 3: Configure MCP Tools
+
+In the OpenAI Apps dashboard, add MCP tool definitions:
+
+```json
+{
+  "name": "get_tasks",
+  "description": "Get user's tasks filtered by status",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": ["pending", "in_progress", "completed", "snoozed"],
+        "description": "Filter tasks by status"
+      }
+    }
+  }
+}
+```
+
+**See** `backend/docs/CHATGPT-CONNECTION-GUIDE.md` for complete tool definitions.
+
+### Step 4: Add Task Widget
+
+Configure the TaskWidget component in OpenAI Apps dashboard:
+
+```json
+{
+  "widget_type": "TaskCard",
+  "render_url": "https://api.yourdomain.com/widgets/task",
+  "actions": [
+    {
+      "type": "button",
+      "label": "Complete",
+      "action": "complete_task",
+      "style": "primary"
+    },
+    {
+      "type": "button",
+      "label": "Snooze",
+      "action": "snooze_task",
+      "style": "secondary"
+    }
+  ]
+}
+```
+
+### Step 5: Test ChatGPT Integration
+
+1. **Open** https://chat.openai.com
+2. **Enable** MindFlow app
+3. **Test commands**:
+   ```
+   "Show me my pending tasks"
+   "Create a task to review deployment docs"
+   "What should I work on next?"
+   "Complete task <task-name>"
+   "Snooze task <task-name> until tomorrow"
+   ```
+
+4. **Verify**:
+   - OAuth flow completes successfully
+   - Tasks display in interactive widget
+   - Complete/Snooze buttons work
+   - Follow-up messages appear after actions
+
+---
+
+## Open Beta Launch Checklist
+
+### Pre-Launch Testing (Complete all before inviting users)
+
+#### 1. Infrastructure Health
+
+- [ ] **DigitalOcean Droplet**: Verify droplet is running and healthy
+  ```bash
+  ssh mindflow@YOUR_DROPLET_IP
+  docker-compose -f docker-compose.prod.yml ps
+  ```
+
+- [ ] **Database**: Test connectivity and verify migrations
+  ```bash
+  docker-compose -f docker-compose.prod.yml exec postgres psql -U mindflow -d mindflow -c "\dt"
+  ```
+
+- [ ] **API Health**: Verify all endpoints responding
+  ```bash
+  curl https://api.yourdomain.com/health
+  # Expected: {"status": "healthy", "version": "4.1.0", "checks": {"database": "healthy"}}
+  ```
+
+#### 2. Security Verification
+
+- [ ] **OAuth 2.1**: Test complete authorization flow
+  - [ ] Authorization endpoint (`/oauth/authorize`)
+  - [ ] Token endpoint (`/oauth/token`)
+  - [ ] PKCE validation
+  - [ ] Token refresh
+  - [ ] Token rotation
+
+- [ ] **HTTPS**: Verify SSL certificate
+  ```bash
+  curl -I https://api.yourdomain.com
+  # Check for: 200 OK, Strict-Transport-Security header
+  ```
+
+- [ ] **CORS**: Test from ChatGPT origin
+  ```bash
+  curl -H "Origin: https://chat.openai.com" \
+       -H "Access-Control-Request-Method: POST" \
+       -X OPTIONS https://api.yourdomain.com/api/tasks
+  ```
+
+- [ ] **Rate Limiting**: Test rate limits
+  ```bash
+  for i in {1..110}; do curl https://api.yourdomain.com/api/tasks; done
+  # Should get 429 after 100 requests
+  ```
+
+#### 3. ChatGPT Integration
+
+- [ ] **MCP Tools**: Test all 5 tools via ChatGPT
+  - [ ] `get_tasks` - List tasks
+  - [ ] `create_task` - Create new task
+  - [ ] `update_task` - Update existing task
+  - [ ] `complete_task` - Mark task complete
+  - [ ] `snooze_task` - Snooze task
+
+- [ ] **Task Widget**: Verify interactive widget rendering
+  - [ ] Widget displays task details correctly
+  - [ ] Complete button works and shows follow-up message
+  - [ ] Snooze button works with snooze duration selection
+
+- [ ] **Error Handling**: Test error scenarios
+  - [ ] Invalid task ID
+  - [ ] Unauthorized access
+  - [ ] Rate limit exceeded
+  - [ ] Database connection failure
+
+#### 4. Performance Testing
+
+- [ ] **Load Test**: Simulate 50 concurrent users
+  ```bash
+  # Install hey (HTTP load testing tool)
+  # https://github.com/rakyll/hey
+  hey -n 1000 -c 50 -H "Authorization: Bearer $TOKEN" \
+      https://api.yourdomain.com/api/tasks
+  ```
+
+- [ ] **Database Performance**: Check query performance
+  ```sql
+  -- Enable query logging
+  ALTER DATABASE mindflow SET log_min_duration_statement = 100;
+
+  -- Review slow queries after load test
+  SELECT query, mean_exec_time, calls
+  FROM pg_stat_statements
+  ORDER BY mean_exec_time DESC
+  LIMIT 10;
+  ```
+
+- [ ] **Memory Usage**: Monitor under load
+  ```bash
+  docker stats mindflow-api mindflow-postgres
+  # API should stay under 500MB
+  # Postgres should stay under 1GB
+  ```
+
+#### 5. Monitoring Setup
+
+- [ ] **Sentry**: Verify error tracking
+  - [ ] Test error capture: `raise Exception("Test error")`
+  - [ ] Verify error appears in Sentry dashboard
+  - [ ] Configure alert rules for critical errors
+
+- [ ] **UptimeRobot**: Configure uptime monitoring
+  - [ ] Monitor: https://api.yourdomain.com/health
+  - [ ] Interval: 5 minutes
+  - [ ] Alerts: Email + SMS for downtime
+
+- [ ] **Log Aggregation**: Verify log collection
+  ```bash
+  docker-compose -f docker-compose.prod.yml logs --tail 100 api | grep ERROR
+  ```
+
+#### 6. Backup & Recovery
+
+- [ ] **Database Backup**: Test backup creation
+  ```bash
+  ./backup.sh
+  ls -lh ~/backups/
+  # Should see today's backup file
+  ```
+
+- [ ] **Backup Restore**: Test restore process
+  ```bash
+  # Create test database
+  docker-compose -f docker-compose.prod.yml exec postgres psql -U mindflow -c "CREATE DATABASE mindflow_test;"
+
+  # Restore backup
+  docker-compose -f docker-compose.prod.yml exec -T postgres \
+    psql -U mindflow -d mindflow_test < ~/backups/mindflow_20251102_020000.sql
+  ```
+
+- [ ] **Rollback Plan**: Document rollback procedure
+  - [ ] Git tag current release: `git tag v1.0.0-beta`
+  - [ ] Document how to revert to previous version
+  - [ ] Test rollback on staging environment
+
+### Beta User Onboarding
+
+#### 1. Invite Beta Users (Start with 10 users)
+
+**Email Template**:
+```
+Subject: You're invited to MindFlow Beta! 🚀
+
+Hi [Name],
+
+You're invited to try MindFlow - an AI-powered task manager that works inside ChatGPT.
+
+Getting Started:
+1. Open ChatGPT: https://chat.openai.com
+2. Enable MindFlow app from the app store
+3. Authorize MindFlow to access your tasks
+4. Try: "Show me my pending tasks"
+
+What to expect:
+- Natural conversation with your task list
+- AI-powered task suggestions
+- Interactive task widgets
+- Intelligent prioritization
+
+We'd love your feedback! Join our beta Slack channel: [link]
+
+Questions? Reply to this email or check our docs: https://yourdomain.com/docs
+
+Happy task managing!
+The MindFlow Team
+```
+
+#### 2. Beta User Support
+
+- [ ] **Create Slack/Discord channel** for beta users
+- [ ] **Setup feedback form**: Google Forms or Typeform
+- [ ] **Monitor first-user experience**: Watch logs during first 10 signups
+- [ ] **Response SLA**: Respond to beta user questions within 2 hours
+
+#### 3. Success Metrics
+
+Track these metrics during beta:
+- **Signups**: Target 100 users in first 30 days
+- **Activation**: % users who create first task (target: 80%)
+- **Retention**: % users active after 7 days (target: 60%)
+- **Engagement**: Average tasks created per user (target: 10)
+- **NPS Score**: Net Promoter Score (target: 50+)
+- **Bug Rate**: Critical bugs per 100 users (target: <2)
+
+### Post-Launch Monitoring
+
+#### First 24 Hours
+
+- [ ] **Hour 1-4**: Monitor every 30 minutes
+  - Check error rates in Sentry
+  - Review API response times
+  - Watch for OAuth issues
+
+- [ ] **Hour 5-24**: Monitor every 2 hours
+  - Check database performance
+  - Review user feedback
+  - Fix critical issues immediately
+
+#### First Week
+
+- [ ] **Daily health check**:
+  ```bash
+  # API health
+  curl https://api.yourdomain.com/health
+
+  # Database connections
+  docker-compose -f docker-compose.prod.yml exec postgres psql -U mindflow -d mindflow -c "SELECT count(*) FROM pg_stat_activity;"
+
+  # Error rate
+  docker-compose -f docker-compose.prod.yml logs api | grep ERROR | wc -l
+  ```
+
+- [ ] **User feedback review**: Daily review of feedback form responses
+- [ ] **Performance review**: Check response times and database queries
+- [ ] **Feature requests**: Document and prioritize user requests
+
+### Scaling Plan (When to scale up)
+
+**Scale from $12 to $24 droplet when**:
+- API response time > 1s (p95)
+- Memory usage > 80% consistently
+- More than 500 active users
+- Database connections > 80% of pool
+
+**Upgrade to**:
+- DigitalOcean: 4GB RAM, 2 vCPU ($24/month)
+- Adjust worker count in Dockerfile: `--workers 4`
+- Increase connection pool: `pool_size=10, max_overflow=10`
 
 ---
 
