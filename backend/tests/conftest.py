@@ -41,7 +41,14 @@ async def db_tables():
 @pytest_asyncio.fixture(scope="function")
 async def db_engine(db_tables):
     """Create test database engine with proper cleanup."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,  # Verify connections before use
+        pool_size=5,  # Reasonable pool size for tests
+        max_overflow=0,  # No overflow connections
+        pool_timeout=30,  # Timeout for getting connection
+    )
 
     yield engine
 
