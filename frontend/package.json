@@ -1,35 +1,24 @@
 {
-  "name": "mindflow-landing-page",
+  "name": "mindflow-chatgpt-sdk",
   "version": "1.0.0",
-  "description": "MindFlow landing page - production-ready single HTML file",
-  "private": true,
+  "description": "ChatGPT Apps SDK components for MindFlow task management",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "python3 -m http.server 8000",
-    "dev:node": "npx http-server -p 8000 -c-1",
-    "dev:live": "npx live-server --port=8000 --no-browser",
-    "test": "playwright test tests/frontend/landing-page.spec.js",
-    "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed",
-    "test:debug": "playwright test --debug",
-    "lighthouse": "lighthouse http://localhost:8000 --view",
-    "lighthouse:ci": "lighthouse http://localhost:8000 --output json --output-path ./lighthouse-report.json",
-    "deploy:cloudflare": "wrangler pages publish . --project-name=mindflow",
-    "deploy:vercel": "vercel --prod",
-    "deploy:netlify": "netlify deploy --prod --dir=."
+    "build": "node build.js",
+    "dev": "node build.js --watch",
+    "typecheck": "tsc --noEmit"
   },
-  "devDependencies": {
-    "@playwright/test": "^1.40.0",
-    "http-server": "^14.1.1",
-    "lighthouse": "^11.4.0",
-    "live-server": "^1.2.2"
-  },
-  "keywords": [
-    "landing-page",
-    "task-manager",
-    "ai",
-    "chatgpt",
-    "productivity"
-  ],
+  "keywords": ["chatgpt", "apps-sdk", "task-management"],
   "author": "MindFlow",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "esbuild": "^0.19.11",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
 }
