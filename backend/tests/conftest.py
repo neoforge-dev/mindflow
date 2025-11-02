@@ -51,12 +51,22 @@ async def db_engine(db_tables):
 
 @pytest_asyncio.fixture
 async def db_session(db_engine):
-    """Session with automatic rollback after each test."""
+    """Session with automatic cleanup after each test."""
     async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
         yield session
-        await session.rollback()  # Rollback any uncommitted changes
+
+        # Clean up: Delete all data from tables (in correct order to respect foreign keys)
+        await session.execute(Base.metadata.tables["tasks"].delete())
+        await session.execute(Base.metadata.tables["user_preferences"].delete())
+        await session.execute(Base.metadata.tables["audit_logs"].delete())
+        await session.execute(Base.metadata.tables["password_reset_tokens"].delete())
+        await session.execute(Base.metadata.tables["refresh_tokens"].delete())
+        await session.execute(Base.metadata.tables["oauth_authorization_codes"].delete())
+        await session.execute(Base.metadata.tables["oauth_clients"].delete())
+        await session.execute(Base.metadata.tables["users"].delete())
+        await session.commit()
         await session.close()
 
 
@@ -124,7 +134,10 @@ async def test_client(db_engine):
     from httpx import ASGITransport, AsyncClient
 
     from app.dependencies import get_db
-    from app.main import app
+    from app.main import create_app
+
+    # Create fresh app instance for each test to avoid event loop issues
+    app = create_app()
 
     # Override get_db dependency to use test database
     async def override_get_db():

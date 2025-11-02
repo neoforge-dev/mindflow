@@ -83,10 +83,11 @@ def create_app() -> FastAPI:
                 content={"detail": "Internal server error"},
             )
 
-    # Setup request ID and logging middleware
-    app.add_middleware(RequestIDMiddleware)
+    # Setup request ID and logging middleware (skip in testing to avoid event loop issues)
+    if not settings.is_testing:
+        app.add_middleware(RequestIDMiddleware)
 
-    # Setup rate limiting
+    # Setup rate limiting (automatically disabled in testing via environment check)
     setup_rate_limiting(app)
 
     # Include routers
