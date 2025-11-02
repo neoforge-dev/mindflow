@@ -699,9 +699,324 @@ Same as local testing, but with production URL.
 
 ---
 
-## 🚀 Beyond Phase 9: Future Enhancements
+## 🚀 Phase 10: Documentation & Production Deployment (2-3 hours)
 
-### Phase 10: Advanced Features (Post-MVP)
+**Status**: 🔄 **NEXT**
+**Priority**: 🔴 **CRITICAL** - Required before first 100 users
+**Target**: Update all documentation to reflect Phase 9B completion
+
+### Overview
+
+With Phase 9B complete, we need to ensure all user-facing documentation accurately reflects the ChatGPT Apps SDK integration and production-ready status.
+
+### Tasks
+
+#### 1. Update Landing Page (30 min) 🎨
+
+**File**: `frontend/index.html`
+
+**Current Status**: Landing page reflects old Custom GPT architecture
+**Required Changes**:
+- Update headline: "Your AI Task Manager Lives in ChatGPT" → "AI-Powered Task Management in ChatGPT"
+- Add Apps SDK badge/mention: "Built with ChatGPT Apps SDK"
+- Update feature list to highlight:
+  - Interactive task cards with complete/snooze buttons
+  - Real-time AI scoring with transparent reasoning
+  - Secure OAuth 2.1 authentication
+  - Zero-install, works directly in ChatGPT
+- Update demo to show task card interface
+- Add production readiness indicators:
+  - "97 tests passing"
+  - "Production-tested error handling"
+  - "Enterprise-grade security"
+
+**Acceptance Criteria**:
+- ✅ Landing page accurately represents current Apps SDK version
+- ✅ Screenshots/demo show new task card interface
+- ✅ Technical achievements highlighted (tests, security, performance)
+- ✅ Clear CTA button to connect ChatGPT
+
+---
+
+#### 2. Sync docs/PLAN.md with backend/docs/PLAN.md (15 min) 📋
+
+**Current Status**: `docs/PLAN.md` is version 8.0 (outdated), `backend/docs/PLAN.md` is version 13.0 (current)
+
+**Required Changes**:
+```bash
+# Copy updated plan to main docs directory
+cp backend/docs/PLAN.md docs/PLAN.md
+```
+
+**Acceptance Criteria**:
+- ✅ docs/PLAN.md matches backend/docs/PLAN.md exactly
+- ✅ Phase 9B shown as complete
+- ✅ All task statuses accurate
+
+---
+
+#### 3. Update docs/README.md (30 min) 📚
+
+**File**: `docs/README.md`
+
+**Current Status**: Version 7.0.0, shows "Phases 1-7 Complete"
+**Required Changes**:
+- Update version: 7.0.0 → 13.0.0
+- Update status: "Phases 1-7 Complete" → "Phases 1-9B Complete - Production Ready"
+- Update test count: 73 tests → 97 tests
+- Add new documentation links:
+  - [CHATGPT-CONNECTION-GUIDE.md](./CHATGPT-CONNECTION-GUIDE.md) - Connector setup guide (573 lines)
+  - [PHASE-9B-VALIDATION.md](./PHASE-9B-VALIDATION.md) - Comprehensive validation (570 lines)
+  - [APPS-SDK-REVIEW.md](./APPS-SDK-REVIEW.md) - OpenAI best practices analysis
+- Update Quick Navigation table to include new docs
+- Update "What is MindFlow?" section:
+  - Add "Built with ChatGPT Apps SDK"
+  - Mention interactive task cards
+  - Highlight production-ready error handling
+- Update "For Developers" section:
+  - Update test count: 73 → 97
+  - Update coverage: 88% → 100% (for ChatGPT integration)
+  - Add Apps SDK setup instructions
+
+**Acceptance Criteria**:
+- ✅ Version and status current
+- ✅ All new documentation linked
+- ✅ Test metrics accurate
+- ✅ Apps SDK prominently featured
+
+---
+
+#### 4. Create docs/APPS-SDK-SETUP.md (45 min) 🛠️
+
+**New File**: `docs/APPS-SDK-SETUP.md`
+
+**Purpose**: Quick start guide for developers wanting to run/modify the Apps SDK integration
+
+**Contents**:
+```markdown
+# ChatGPT Apps SDK Setup Guide
+
+## Prerequisites
+- Node.js 18+ (frontend)
+- Python 3.11+ (backend)
+- ChatGPT Plus/Pro account
+- ngrok or public HTTPS endpoint
+
+## Quick Start (10 minutes)
+
+### 1. Start Backend
+\`\`\`bash
+cd backend
+uv sync
+make run
+# Backend running on http://localhost:8000
+\`\`\`
+
+### 2. Start MCP Server
+\`\`\`bash
+# Terminal 2
+cd backend
+make mcp-server
+# MCP server on http://localhost:8001
+\`\`\`
+
+### 3. Expose via ngrok
+\`\`\`bash
+# Terminal 3
+ngrok http 8001
+# Get URL: https://abc123.ngrok.io
+\`\`\`
+
+### 4. Connect to ChatGPT
+See [CHATGPT-CONNECTION-GUIDE.md](./CHATGPT-CONNECTION-GUIDE.md)
+
+## Development
+
+### Frontend Development
+\`\`\`bash
+cd frontend
+npm install
+npm run dev        # Development mode
+npm run build      # Production build
+npm test           # Run 52 tests
+\`\`\`
+
+### Backend Development
+\`\`\`bash
+cd backend
+uv run pytest tests/mcp_server/  # Run 45 tests
+uv run ruff check mcp_server/    # Lint code
+\`\`\`
+
+### Component Development
+Edit \`frontend/src/components/TaskWidget.tsx\`
+
+After changes:
+\`\`\`bash
+npm run build
+cp dist/index.js ../backend/mcp_server/assets/taskwidget.js
+\`\`\`
+
+## Testing
+
+### Frontend Tests (52 tests)
+- SDK initialization and tool calls
+- TaskWidget rendering and interactions
+- Error handling and loading states
+
+### Backend Tests (45 tests)
+- OAuth token verification
+- Component embedding
+- MCP tool execution
+- API integration
+
+### Manual Testing
+1. Start all services
+2. Connect to ChatGPT
+3. Test prompts:
+   - "What should I work on?"
+   - Click Complete button
+   - Click Snooze button
+   - Verify error messages
+
+## Troubleshooting
+See [CHATGPT-CONNECTION-GUIDE.md](./CHATGPT-CONNECTION-GUIDE.md#troubleshooting)
+```
+
+**Acceptance Criteria**:
+- ✅ Clear step-by-step setup instructions
+- ✅ Development workflow documented
+- ✅ Testing procedures explained
+- ✅ Troubleshooting section links to connection guide
+
+---
+
+#### 5. Update Project README.md (30 min) 📖
+
+**File**: `README.md` (root level)
+
+**Current Status**: May be outdated or generic
+**Required Changes**:
+- Update project description to highlight Apps SDK
+- Add badges:
+  - ![Tests](https://img.shields.io/badge/tests-97%20passing-success)
+  - ![TypeScript](https://img.shields.io/badge/typescript-strict-blue)
+  - ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+- Update features list to match landing page
+- Add quick start section linking to docs/APPS-SDK-SETUP.md
+- Update architecture diagram (if exists) to show Apps SDK
+- Add "Production Ready" section with metrics:
+  - 97/97 tests passing
+  - Zero compilation errors
+  - Complete error handling
+  - OAuth 2.1 security
+- Add deployment status: "Ready to ship"
+
+**Acceptance Criteria**:
+- ✅ README accurately represents current state
+- ✅ Clear badges showing quality metrics
+- ✅ Easy-to-follow quick start
+- ✅ Links to detailed documentation
+
+---
+
+#### 6. Production Deployment Preparation (30 min) 🚀
+
+**Tasks**:
+1. Create `.env.production.example` with required vars
+2. Update deployment guide with Apps SDK specifics
+3. Create deployment checklist
+4. Document rollback procedure
+
+**File**: Update `backend/docs/DEPLOYMENT-GUIDE.md`
+
+**Add Section**: "ChatGPT Apps SDK Deployment"
+
+**Contents**:
+```markdown
+## ChatGPT Apps SDK Deployment
+
+### Environment Variables
+\`\`\`bash
+# Required for Apps SDK
+API_BASE_URL=https://your-domain.com
+OAUTH_ISSUER=https://your-domain.com
+JWT_PRIVATE_KEY_PATH=/path/to/private-key.pem
+JWT_PUBLIC_KEY_PATH=/path/to/public-key.pem
+MCP_SERVER_PORT=8001
+
+# OAuth Settings
+OAUTH_ACCESS_TOKEN_EXPIRE_MINUTES=60
+OAUTH_REFRESH_TOKEN_EXPIRE_DAYS=90
+\`\`\`
+
+### Pre-Deployment Checklist
+- [ ] All 97 tests passing locally
+- [ ] Production environment variables set
+- [ ] SSL certificate installed
+- [ ] Database migrations run
+- [ ] OAuth keys generated and secure
+- [ ] Monitoring configured (Sentry, etc.)
+- [ ] Rate limiting configured
+- [ ] Backup strategy in place
+
+### Deployment Steps
+1. Deploy backend to production server
+2. Start MCP server on configured port
+3. Configure Nginx reverse proxy
+4. Test health endpoints
+5. Register ChatGPT connector
+6. Run smoke tests
+
+### Post-Deployment Verification
+\`\`\`bash
+# Health check
+curl https://your-domain.com/health
+
+# MCP health check
+curl https://your-domain.com/mcp/health
+
+# OAuth discovery
+curl https://your-domain.com/.well-known/oauth-authorization-server
+\`\`\`
+
+### Rollback Procedure
+1. Identify issue in logs
+2. Stop MCP server: \`systemctl stop mcp-server\`
+3. Revert to previous version
+4. Restart services
+5. Verify health checks
+```
+
+**Acceptance Criteria**:
+- ✅ Clear deployment steps
+- ✅ Environment variables documented
+- ✅ Pre-deployment checklist complete
+- ✅ Rollback procedure clear
+
+---
+
+### Phase 10 Success Criteria
+
+**Documentation Complete When:**
+1. ✅ Landing page reflects Apps SDK implementation
+2. ✅ All PLAN.md files in sync (version 13.0)
+3. ✅ docs/README.md updated to 13.0.0
+4. ✅ New APPS-SDK-SETUP.md created
+5. ✅ Root README.md updated with badges
+6. ✅ Deployment guide includes Apps SDK section
+
+**Production Ready When:**
+7. ✅ All documentation accurate and complete
+8. ✅ Deployment checklist verified
+9. ✅ Team can follow docs to deploy
+10. ✅ Users can follow docs to connect
+
+---
+
+## 🚀 Beyond Phase 10: Future Enhancements
+
+### Phase 11: Advanced Features (Post-MVP)
 
 **Display Mode Transitions** (2 hours):
 - Fullscreen mode for deep focus
