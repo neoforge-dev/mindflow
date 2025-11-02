@@ -4,7 +4,6 @@ This module handles loading and embedding React components
 in MCP tool responses for ChatGPT Apps SDK integration.
 """
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +38,7 @@ def load_component_code(component_name: str = "taskcard") -> str:
         )
 
     # Read and cache component code
-    with open(component_file, "r", encoding="utf-8") as f:
+    with open(component_file, encoding="utf-8") as f:
         code = f.read()
 
     _component_cache[component_name] = code
