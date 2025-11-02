@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_hours: int = 24
 
+    # OAuth & Apps SDK
+    api_base_url: str = os.getenv("API_BASE_URL", "http://localhost:8000")
+
     # Environment
     environment: str = os.getenv("ENVIRONMENT", "development")
     debug: bool = environment == "development"

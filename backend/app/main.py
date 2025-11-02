@@ -55,9 +55,7 @@ def create_app() -> FastAPI:
     # Exception handlers
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, exc: ValueError):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)}
-        )
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
 
     @app.exception_handler(Exception)
     async def general_exception_handler(_request: Request, exc: Exception):
@@ -95,10 +93,12 @@ def create_app() -> FastAPI:
     from app.api.auth import router as auth_router
     from app.api.health import router as health_router
     from app.api.tasks import router as tasks_router
+    from app.oauth.discovery import router as oauth_router
 
     app.include_router(auth_router)
     app.include_router(health_router)
     app.include_router(tasks_router)
+    app.include_router(oauth_router)
 
     return app
 
