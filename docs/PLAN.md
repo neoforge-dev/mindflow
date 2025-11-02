@@ -699,7 +699,7 @@ tests/frontend/
 
 ---
 
-**Version**: 9.0.0
+**Version**: 10.0.0 (Major Update: Complete Apps SDK Specification)
 **Philosophy**: First Principles + Pareto Principle
 **Mantra**: "Ship working software that delivers business value"
 
@@ -707,8 +707,8 @@ tests/frontend/
 
 ## 🎨 PHASE 9: OPENAI APPS SDK INTEGRATION (Post-Launch Enhancement)
 
-**Timeline**: 1 week (after Phase 8C deployment)
-**Effort**: 28-32 hours
+**Timeline**: 1.5-2 weeks (after Phase 8C deployment)
+**Effort**: 40-50 hours (updated estimate with OAuth + compliance)
 **Business Value**: Enhanced ChatGPT UX with interactive task cards
 **Trigger**: Launch complete + initial user feedback positive
 
@@ -724,90 +724,160 @@ tests/frontend/
 - Visual priority indicators (color-coded badges)
 - One-click actions (complete, snooze, reschedule)
 - State persistence across conversation turns
+- Carousel mode for browsing multiple tasks
+- Fullscreen mode for rich editing
 
-### 9A: MCP Server + React Components (5 days, 28 hours)
+### 9A: MCP Server + React Components + OAuth (7-10 days, 40-50 hours)
 
 **Status**: PLANNED (build after Phase 8C deployment)
 
 #### Architecture Overview
 
+**Updated Architecture** (Python MCP Server):
 ```
-ChatGPT Conversation
-  ↓ (user asks "what should I work on?")
-GPT calls MCP tool: "getBestTask"
+ChatGPT (OAuth Client)
+  ↓ Discovery: GET /.well-known/oauth-authorization-server
+FastAPI Backend (Authorization Server)
+  ├── OAuth Discovery Endpoints:
+  │   ├── /oauth/authorize (user login flow)
+  │   ├── /oauth/token (exchange code for access token)
+  │   ├── /oauth/register (dynamic client registration)
+  │   └── /.well-known/jwks.json (public keys for verification)
   ↓
-MCP Server (Node.js/Python)
-  ↓ (proxies to)
-FastAPI Backend (localhost:8000 or production)
-  ↓ (returns)
+ChatGPT → User authorizes → Receives access token
+  ↓ User asks: "what should I work on?"
+ChatGPT calls MCP tool: "mindflow.get_best_task"
+  ↓ Includes OAuth access token
+Python MCP Server (FastMCP) - https://your-domain.com/mcp
+  ├── Verifies JWT token (issuer, audience, expiration, scopes)
+  ├── Proxies to FastAPI Backend with user context
+  └── Returns task with widget metadata
+  ↓
+FastAPI Backend (https://api.yourdomain.com)
+  ↓ Returns task data
 {
-  "task": {...},
+  "task": {
+    "id": "...",
+    "title": "Review pull request",
+    "priority": 5,
+    "due_date": "2025-11-03T14:00:00Z",
+    "score": 95.5
+  },
   "_meta": {
-    "openai/outputTemplate": "task-card" // Triggers React component
+    "openai/outputTemplate": "<embedded React component code>",
+    "openai/displayMode": "inline",
+    "openai/widgetId": "task-card-123"
   }
 }
   ↓
-ChatGPT renders React component
+ChatGPT renders React component in iframe
+  ↓ Component accesses via window.openai API
+window.openai.toolOutput → Task data
+window.openai.callTool("mindflow.complete_task", {taskId})
+window.openai.setWidgetState({selectedFilter: "high-priority"})
   ↓
-User sees interactive task card
+User sees interactive task card with live actions
 ```
+
+**Key Changes from Previous Plan**:
+1. ✅ **Python MCP Server** (not Node.js) using FastMCP library
+2. ✅ **OAuth 2.1** with MCP Authorization Spec (full implementation)
+3. ✅ **HTTPS Public Endpoint** required (ngrok for dev, production hosting)
+4. ✅ **Embedded Component** in metadata (single ESM bundle)
+5. ✅ **Display Mode Strategy** (inline, carousel, fullscreen, PiP)
 
 #### Files to Create
 
-**Frontend (React + TypeScript)**:
+**Frontend (React + TypeScript)** - Build to single ESM bundle:
 ```
 frontend/apps-sdk/
 ├── src/
 │   ├── components/
 │   │   ├── TaskCard.tsx                    # Main task display component
-│   │   ├── TaskList.tsx                    # Multiple tasks view
+│   │   ├── TaskList.tsx                    # Multiple tasks view (carousel)
+│   │   ├── TaskEditor.tsx                  # Fullscreen edit mode
 │   │   ├── PriorityBadge.tsx              # Visual priority indicator
 │   │   ├── TaskActions.tsx                # Complete/snooze/reschedule buttons
 │   │   └── EmptyState.tsx                 # No tasks state
 │   ├── services/
 │   │   ├── openai-client.ts               # window.openai wrapper
-│   │   └── state-manager.ts               # Component state persistence
+│   │   └── state-manager.ts               # 3-tier state management
+│   ├── hooks/
+│   │   ├── useWidgetState.ts              # Widget-level state hook
+│   │   ├── useOpenAiGlobal.ts             # Theme/locale reactive hook
+│   │   └── useDisplayMode.ts              # Display mode transitions
 │   ├── types/
 │   │   └── task.ts                        # Task type definitions
-│   ├── App.tsx                            # Root component
+│   ├── App.tsx                            # Root component with mode router
 │   └── index.tsx                          # Entry point
-├── package.json                           # React 18+, TypeScript, Tailwind
+├── package.json                           # React 18+, TypeScript (NO Tailwind*)
 ├── tsconfig.json                          # TypeScript config
-├── vite.config.ts                         # Build with Vite
-└── tailwind.config.js                     # Styling
+├── esbuild.config.js                      # ⚠️ Single ESM bundle (not Vite)
+└── README.md                              # Build instructions
+
+*Note: Design guidelines require system fonts/colors only
 ```
 
-**MCP Server (connects ChatGPT to FastAPI)**:
+**Python MCP Server** (FastMCP) - Connects ChatGPT to FastAPI:
 ```
-mcp-server/
-├── src/
-│   ├── server.ts                          # MCP server entry point
-│   ├── tools/
-│   │   ├── getBestTask.ts                 # GET /api/tasks/best
-│   │   ├── createTask.ts                  # POST /api/tasks
-│   │   ├── completeTask.ts                # PUT /api/tasks/{id} (status=completed)
-│   │   ├── snoozeTask.ts                  # PUT /api/tasks/{id} (snoozed_until)
-│   │   ├── rescheduleTask.ts              # PUT /api/tasks/{id} (due_date)
-│   │   └── getPendingTasks.ts             # GET /api/tasks/pending
-│   ├── config.ts                          # Backend URL, auth config
-│   └── types.ts                           # MCP tool schemas
-├── package.json                           # @modelcontextprotocol/sdk
-├── tsconfig.json
-└── README.md                              # Setup instructions
+mcp_server/
+├── server.py                              # MCP server entry point (FastMCP)
+├── tools/
+│   ├── __init__.py
+│   ├── get_best_task.py                   # GET /api/tasks/best
+│   ├── create_task.py                     # POST /api/tasks
+│   ├── complete_task.py                   # PUT /api/tasks/{id} (status=completed)
+│   ├── snooze_task.py                     # PUT /api/tasks/{id} (snoozed_until)
+│   ├── reschedule_task.py                 # PUT /api/tasks/{id} (due_date)
+│   └── get_pending_tasks.py               # GET /api/tasks/pending (carousel)
+├── auth/
+│   ├── __init__.py
+│   ├── jwt_verifier.py                    # Verify OAuth tokens via JWKS
+│   └── oauth_client.py                    # Token introspection (if needed)
+├── config.py                              # Backend URL, JWKS URL, scopes
+├── types.py                               # MCP tool schemas
+├── assets/
+│   └── component.js                       # Built React component (embedded)
+├── requirements.txt                       # fastmcp, httpx, pyjwt, etc.
+├── pyproject.toml                         # uv project config
+├── Dockerfile                             # Containerized deployment
+└── README.md                              # Setup + deployment instructions
+```
+
+**FastAPI Backend Updates** (OAuth endpoints):
+```
+backend/app/
+├── oauth/
+│   ├── __init__.py
+│   ├── discovery.py                       # /.well-known/oauth-authorization-server
+│   ├── authorize.py                       # /oauth/authorize (login flow)
+│   ├── token.py                           # /oauth/token (code exchange)
+│   ├── register.py                        # /oauth/register (dynamic clients)
+│   └── jwks.py                            # /.well-known/jwks.json (public keys)
+└── (existing files remain unchanged)
 ```
 
 **Tests**:
 ```
 tests/apps-sdk/
 ├── components/
-│   ├── TaskCard.test.tsx                  # Component rendering tests
-│   ├── TaskActions.test.tsx               # Button interaction tests
-│   └── integration.test.tsx               # Full flow tests
+│   ├── test_task_card.tsx                  # Component rendering tests
+│   ├── test_task_actions.tsx               # Button interaction tests
+│   ├── test_display_modes.tsx              # Inline/carousel/fullscreen
+│   └── test_integration.tsx                # Full flow tests
 ├── mcp/
-│   ├── server.test.ts                     # MCP server tests
-│   └── tools.test.ts                      # Tool invocation tests
+│   ├── test_server.py                      # FastMCP server tests
+│   ├── test_tools.py                       # Tool invocation tests
+│   ├── test_auth.py                        # OAuth token verification
+│   └── test_metadata.py                    # Widget metadata generation
+├── oauth/
+│   ├── test_discovery.py                   # Discovery endpoint tests
+│   ├── test_authorize.py                   # Authorization flow tests
+│   ├── test_token.py                       # Token exchange tests
+│   └── test_jwks.py                        # JWKS generation/validation
 └── e2e/
-    └── chatgpt-flow.test.ts               # End-to-end ChatGPT test
+    ├── test_chatgpt_flow.py                # End-to-end ChatGPT simulation
+    └── test_oauth_flow.py                  # Full OAuth 2.1 flow test
 ```
 
 #### Component Functions
@@ -923,6 +993,685 @@ test_multiple_tasks_render_as_scrollable_list
 
 test_error_recovery_when_backend_unreachable
 // Disconnects backend, verifies fallback message displayed in ChatGPT
+```
+
+---
+
+### 🔐 OAuth 2.1 Implementation (Critical Addition)
+
+**Why OAuth 2.1?**: Required by Apps SDK for user authentication and authorization
+
+#### FastAPI Backend - OAuth Endpoints
+
+**Discovery Endpoint** (`backend/app/oauth/discovery.py`):
+```python
+@router.get("/.well-known/oauth-authorization-server")
+async def oauth_discovery():
+    """OAuth 2.1 AS metadata (RFC 8414)"""
+    return {
+        "issuer": "https://api.yourdomain.com",
+        "authorization_endpoint": "https://api.yourdomain.com/oauth/authorize",
+        "token_endpoint": "https://api.yourdomain.com/oauth/token",
+        "registration_endpoint": "https://api.yourdomain.com/oauth/register",
+        "jwks_uri": "https://api.yourdomain.com/.well-known/jwks.json",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "token_endpoint_auth_methods_supported": ["client_secret_basic"],
+        "scopes_supported": ["tasks:read", "tasks:write", "openid", "profile"]
+    }
+```
+
+**Authorization Endpoint** (`backend/app/oauth/authorize.py`):
+```python
+@router.get("/oauth/authorize")
+async def authorize(
+    client_id: str,
+    redirect_uri: str,
+    response_type: str,  # Must be "code"
+    scope: str,  # Space-separated scopes
+    state: str,  # CSRF protection
+    code_challenge: str | None = None,  # PKCE (recommended)
+    code_challenge_method: str = "S256"
+):
+    """OAuth authorization flow - redirects to login if not authenticated"""
+    # 1. Validate client_id against registered clients
+    # 2. Show login form if user not authenticated
+    # 3. After login, show consent screen with requested scopes
+    # 4. Generate authorization code
+    # 5. Redirect to redirect_uri with code + state
+    pass
+```
+
+**Token Endpoint** (`backend/app/oauth/token.py`):
+```python
+@router.post("/oauth/token")
+async def token(
+    grant_type: str,  # "authorization_code" or "refresh_token"
+    code: str | None = None,  # Authorization code
+    redirect_uri: str | None = None,
+    client_id: str,
+    client_secret: str,
+    refresh_token: str | None = None,
+    code_verifier: str | None = None  # PKCE verifier
+):
+    """Exchange authorization code for access token"""
+    if grant_type == "authorization_code":
+        # 1. Verify code is valid and not expired
+        # 2. Verify redirect_uri matches
+        # 3. Verify code_verifier (if PKCE used)
+        # 4. Generate access_token (JWT) + refresh_token
+        # 5. Return tokens
+        return {
+            "access_token": "eyJ...",  # JWT with user_id + scopes
+            "token_type": "Bearer",
+            "expires_in": 86400,  # 24 hours
+            "refresh_token": "...",  # 30 days
+            "scope": "tasks:read tasks:write"
+        }
+    elif grant_type == "refresh_token":
+        # Verify refresh token, issue new access token
+        pass
+```
+
+**JWKS Endpoint** (`backend/app/oauth/jwks.py`):
+```python
+@router.get("/.well-known/jwks.json")
+async def jwks():
+    """JSON Web Key Set for token verification"""
+    # Return public keys used to sign JWTs
+    return {
+        "keys": [
+            {
+                "kty": "RSA",
+                "use": "sig",
+                "kid": "2024-11-02",
+                "n": "...",  # RSA public key modulus
+                "e": "AQAB"  # RSA public key exponent
+            }
+        ]
+    }
+```
+
+#### Python MCP Server - Token Verification
+
+**JWT Verification** (`mcp_server/auth/jwt_verifier.py`):
+```python
+import httpx
+from jose import jwt, JWTError
+from fastapi import HTTPException
+
+class JWTVerifier:
+    def __init__(self, jwks_url: str):
+        self.jwks_url = jwks_url
+        self.keys_cache = None
+
+    async def verify_token(self, token: str, required_scopes: list[str]) -> dict:
+        """Verify JWT token and check scopes"""
+        try:
+            # 1. Fetch JWKS (cache for 1 hour)
+            if not self.keys_cache:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(self.jwks_url)
+                    self.keys_cache = resp.json()
+
+            # 2. Decode JWT header to get kid (key ID)
+            unverified_header = jwt.get_unverified_header(token)
+            kid = unverified_header["kid"]
+
+            # 3. Find matching key
+            key = next(k for k in self.keys_cache["keys"] if k["kid"] == kid)
+
+            # 4. Verify signature, issuer, audience, expiration
+            payload = jwt.decode(
+                token,
+                key,
+                algorithms=["RS256"],
+                issuer="https://api.yourdomain.com",
+                audience="https://your-domain.com/mcp"
+            )
+
+            # 5. Check scopes
+            token_scopes = payload.get("scope", "").split()
+            if not all(scope in token_scopes for scope in required_scopes):
+                raise HTTPException(401, "Insufficient scopes")
+
+            return payload  # Contains user_id, scopes, etc.
+
+        except JWTError:
+            raise HTTPException(401, "Invalid token")
+```
+
+**MCP Tool with OAuth** (`mcp_server/tools/get_best_task.py`):
+```python
+from fastmcp import FastMCP
+
+mcp = FastMCP("MindFlow")
+
+@mcp.tool(security="oauth2", scopes=["tasks:read"])
+async def get_best_task(auth_token: str) -> dict:
+    """Get your highest priority task based on AI scoring.
+
+    This tool requires authentication and the 'tasks:read' scope.
+    """
+    # 1. Verify token
+    verifier = JWTVerifier(jwks_url="https://api.yourdomain.com/.well-known/jwks.json")
+    user = await verifier.verify_token(auth_token, ["tasks:read"])
+
+    # 2. Call FastAPI backend
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.yourdomain.com/api/tasks/best",
+            headers={"Authorization": f"Bearer {auth_token}"}
+        )
+        task = response.json()
+
+    # 3. Load embedded component
+    with open("assets/component.js") as f:
+        component_code = f.read()
+
+    # 4. Return with widget metadata
+    return {
+        "task": task,
+        "_meta": {
+            "openai/outputTemplate": component_code,  # Embedded React component
+            "openai/displayMode": "inline",
+            "openai/widgetId": f"task-{task['id']}"
+        }
+    }
+
+@mcp.tool(security="noauth")  # Read-only, no auth required
+async def get_task_count() -> dict:
+    """Get total count of pending tasks (no authentication required)."""
+    # This tool can be called without OAuth
+    pass
+```
+
+---
+
+### 📱 Display Mode Strategy (Complete)
+
+**All 4 Display Modes**:
+
+| Mode | Use Case | Size Constraints | Max Actions | Best For |
+|------|----------|------------------|-------------|----------|
+| **inline** | Default cards | 300-500px height | 2 buttons | Single tasks, quick actions |
+| **inline-carousel** | Browsing items | 300-400px height | 2 per card | 3-8 similar tasks |
+| **fullscreen** | Rich interactions | Full screen | Unlimited | Editing, complex forms |
+| **picture-in-picture** | Persistent state | Floating window | Unlimited | Games, collaboration |
+
+**Decision Matrix**:
+```python
+def get_display_mode(tool_name: str, result_count: int, action_type: str) -> str:
+    """Determine optimal display mode for tool response."""
+
+    if tool_name == "mindflow.get_best_task":
+        return "inline"  # Single card, simple actions
+
+    elif tool_name == "mindflow.get_pending_tasks":
+        if result_count <= 8:
+            return "inline-carousel"  # Swipeable card list
+        else:
+            return "fullscreen"  # Too many for carousel
+
+    elif tool_name == "mindflow.create_task":
+        return "fullscreen"  # Rich form with date pickers
+
+    elif tool_name == "mindflow.edit_task":
+        return "fullscreen"  # Multi-field editing
+
+    else:
+        return "inline"  # Safe default
+```
+
+**Component Implementation**:
+```typescript
+// App.tsx - Display mode router
+function App() {
+  const { displayMode } = useOpenAiGlobal();
+
+  switch (displayMode) {
+    case 'inline':
+      return <TaskCard />;
+    case 'inline-carousel':
+      return <TaskList />;
+    case 'fullscreen':
+      return <TaskEditor />;
+    default:
+      return <TaskCard />;
+  }
+}
+```
+
+---
+
+### 🔄 State Management (3-Tier Architecture)
+
+**Type 1: Business Data (Server Authority)**:
+- **Ownership**: FastAPI backend
+- **Lifespan**: Long-lived (database)
+- **Examples**: Task title, due date, priority, completion status
+- **Update Pattern**: Server-driven; widget reads from `window.openai.toolOutput`
+
+**Type 2: UI State (Widget Ephemeral)**:
+- **Ownership**: React component
+- **Lifespan**: Duration of widget instance
+- **Examples**: Expanded panels, selected filters, sort order
+- **Storage**: `window.openai.setWidgetState(widgetId, state)` (max 4k tokens)
+
+**Type 3: Cross-Session State (Backend Persistent)**:
+- **Ownership**: FastAPI backend (user preferences table)
+- **Lifespan**: Persists across conversations and devices
+- **Examples**: Default view mode, saved filters, workspace selection
+- **Access**: Via authenticated API calls; requires OAuth
+
+**Implementation Example**:
+```typescript
+// state-manager.ts
+interface StateManager {
+  // Business data (read-only from tool output)
+  getTaskData(): Task;
+
+  // UI state (widget-scoped)
+  getUIState(): { filter: string; sortBy: string };
+  setUIState(state: { filter?: string; sortBy?: string }): void;
+
+  // Cross-session state (backend API)
+  getUserPreferences(): Promise<UserPreferences>;
+  saveUserPreferences(prefs: UserPreferences): Promise<void>;
+}
+
+// Usage in component
+function TaskList() {
+  const task = useToolOutput();  // Business data
+  const [uiState, setUIState] = useWidgetState();  // UI state
+  const [prefs] = useUserPreferences();  // Cross-session state
+
+  return (
+    <div>
+      <FilterBar
+        currentFilter={uiState.filter}
+        onChange={(f) => setUIState({ filter: f })}
+      />
+      <TaskCard task={task} />
+    </div>
+  );
+}
+```
+
+**State Size Limits**:
+- Widget state: **< 4k tokens** (enforced by ChatGPT)
+- Strategies for large datasets:
+  - Store IDs only, fetch full data via `callTool`
+  - Paginate results
+  - Use backend storage for large state
+
+---
+
+### 🎨 Design Guidelines & Constraints
+
+**MUST Follow** (enforced during ChatGPT review):
+
+1. **Typography**:
+   ```css
+   /* ✅ REQUIRED: Inherit system fonts */
+   font-family: inherit;
+   font-size: inherit;
+
+   /* ❌ FORBIDDEN: Custom fonts */
+   font-family: 'Custom Font', sans-serif;  /* REJECTED */
+   ```
+
+2. **Colors**:
+   ```css
+   /* ✅ ALLOWED: System-defined colors */
+   color: var(--text-primary);
+   background: var(--surface-primary);
+
+   /* ❌ FORBIDDEN: Custom brand colors in backgrounds */
+   background: #FF6B6B;  /* REJECTED if used for backgrounds */
+
+   /* ✅ ALLOWED: Brand colors in logos/icons only */
+   <img src="logo.svg" style="fill: #FF6B6B" />  /* OK */
+   ```
+
+3. **Spacing**: Use consistent margins/padding
+   ```css
+   /* ✅ System grid values */
+   padding: 8px 12px;  /* or 12px 16px or 16px 20px */
+
+   /* ❌ Random values */
+   padding: 7px 13px;  /* Inconsistent */
+   ```
+
+4. **Icons**: Monochromatic, outlined style
+   ```tsx
+   /* ✅ Simple, outlined icons */
+   <CheckCircleIcon stroke="currentColor" fill="none" />
+
+   /* ❌ Filled or multi-color icons */
+   <CheckCircleIcon fill="#00FF00" />  /* REJECTED */
+   ```
+
+5. **Actions in Inline Cards**: Maximum 2 primary buttons
+   ```tsx
+   /* ✅ OK: 2 actions */
+   <Button>Complete</Button>
+   <Button>Snooze</Button>
+
+   /* ❌ REJECTED: 3+ actions in inline */
+   <Button>Complete</Button>
+   <Button>Snooze</Button>
+   <Button>Edit</Button>  /* Too many */
+   ```
+
+6. **No Internal Scrolling in Inline Mode**:
+   ```tsx
+   /* ❌ FORBIDDEN in inline */
+   <div style="overflow-y: scroll; height: 300px">
+     {tasks.map(...)}  /* REJECTED */
+   </div>
+
+   /* ✅ Use carousel or fullscreen instead */
+   displayMode: "inline-carousel"  /* For scrolling lists */
+   ```
+
+---
+
+### 📊 Metadata Optimization Strategy
+
+**Why Critical**: Tool descriptions control when ChatGPT calls your app
+
+#### Best Practices
+
+**1. Domain-Paired Naming**:
+```python
+# ✅ GOOD: Namespaced tool names
+@mcp.tool()
+async def mindflow_get_best_task():  # or "mindflow.get_best_task"
+    """Get the user's highest priority task from MindFlow."""
+    pass
+
+# ❌ BAD: Generic names
+@mcp.tool()
+async def get_task():  # Conflicts with other apps
+    pass
+```
+
+**2. "Use This When..." Descriptions**:
+```python
+@mcp.tool()
+async def mindflow_get_best_task():
+    """Get the user's highest priority task from MindFlow.
+
+    Use this when:
+    - User asks "what should I work on?"
+    - User asks "what's my top priority?"
+    - User wants AI-powered task recommendations
+
+    Do NOT use for:
+    - Creating new tasks (use mindflow.create_task)
+    - Setting reminders (out of scope)
+    """
+    pass
+```
+
+**3. Parameter Examples & Constraints**:
+```python
+from pydantic import Field
+
+@mcp.tool()
+async def mindflow_create_task(
+    title: str = Field(..., description="Task title", example="Review PR #123"),
+    priority: int = Field(3, ge=1, le=5, description="Priority 1-5, where 5 is highest"),
+    due_date: str | None = Field(None, description="ISO 8601 datetime", example="2025-11-05T14:00:00Z")
+):
+    """Create a new task in MindFlow."""
+    pass
+```
+
+**4. Read-Only Hints**:
+```python
+@mcp.tool(readOnlyHint=True)
+async def mindflow_get_pending_tasks():
+    """List all pending tasks (read-only, no side effects)."""
+    pass
+
+@mcp.tool(readOnlyHint=False)
+async def mindflow_complete_task(task_id: str):
+    """Mark a task as completed (write operation, requires confirmation)."""
+    pass
+```
+
+#### Testing & Optimization Workflow
+
+**Golden Prompt Dataset** (20-50 test cases):
+```python
+GOLDEN_PROMPTS = [
+    # Direct references
+    "What should I work on?",
+    "Show me my top priority task",
+    "Get my best task from MindFlow",
+
+    # Indirect requests
+    "I'm ready to be productive, what's next?",
+    "Help me prioritize my work",
+
+    # Negative cases (should NOT trigger)
+    "Set a reminder for 3pm",  # Not our domain
+    "Create a calendar event",  # Not our domain
+
+    # Edge cases
+    "Show me all my tasks",  # get_pending_tasks, not get_best_task
+]
+```
+
+**Weekly Review Process**:
+1. Run golden prompt dataset against production
+2. Track precision (correct tool called) and recall (tool called when should be)
+3. Analyze false positives (wrong tool called) and false negatives (missed calls)
+4. Iterate metadata changes ONE AT A TIME
+5. Document changes with timestamps and diffs
+
+---
+
+### 🚀 Deployment Strategy
+
+**Requirements**:
+1. **HTTPS Public Endpoint**: MCP server must be publicly accessible
+2. **SSL Certificate**: Required for production
+3. **CORS**: Must allow ChatGPT origins
+
+#### Development: ngrok Tunnel
+
+```bash
+# Terminal 1: Start MCP server locally
+cd mcp_server
+uv run python server.py  # Runs on localhost:3000
+
+# Terminal 2: Expose with ngrok
+ngrok http 3000
+# Output: https://abc123.ngrok.io → localhost:3000
+
+# Terminal 3: Update ChatGPT connector
+# In ChatGPT Settings → Connectors → Create
+# Connector URL: https://abc123.ngrok.io/mcp
+```
+
+**Alternative: Cloudflare Tunnel** (persistent URLs):
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+#### Production: DigitalOcean Deployment
+
+**Option 1: Same Droplet as FastAPI** (recommended for MVP):
+```
+DigitalOcean Droplet
+├── Port 8000: FastAPI Backend
+├── Port 3000: Python MCP Server
+└── Nginx:
+    ├── api.yourdomain.com → :8000 (FastAPI)
+    └── mcp.yourdomain.com → :3000 (MCP Server)
+```
+
+**Nginx Config** (`/etc/nginx/sites-available/mcp`):
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name mcp.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/mcp.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mcp.yourdomain.com/privkey.pem;
+
+    location /mcp {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+**Systemd Service** (`/etc/systemd/system/mindflow-mcp.service`):
+```ini
+[Unit]
+Description=MindFlow MCP Server
+After=network.target mindflow.service
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/mindflow/mcp_server
+Environment="PATH=/opt/mindflow/mcp_server/.venv/bin:$PATH"
+ExecStart=/opt/mindflow/mcp_server/.venv/bin/python server.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Option 2: Separate Service** (for scale):
+- Deploy MCP server to Cloud Run, Lambda, or separate droplet
+- Benefits: Independent scaling, isolated failures
+- Cost: +$5-10/month
+
+---
+
+### ✅ Compliance Checklist & Review Process
+
+**Pre-Submission Requirements**:
+
+- [ ] **Developer Verification**: Identity verification complete
+- [ ] **Support Contact**: Active email address provided
+- [ ] **Demo Credentials**: Full-featured test account for review
+- [ ] **Production Ready**: No beta/demo disclaimers
+- [ ] **Accurate Metadata**: Tool names, descriptions match actual functionality
+- [ ] **Age Appropriate**: Suitable for 13+ (no NSFW content)
+
+**Privacy & Data Protection**:
+
+- [ ] **Minimal Data Collection**: Only request necessary fields
+- [ ] **No Prohibited Data**: No PCI, PHI, government IDs, passwords, raw location
+- [ ] **No Surveillance**: No tracking or behavioral profiling without disclosure
+- [ ] **Write Actions Labeled**: All mutations have clear labels and require confirmation
+- [ ] **No Chat Log Reconstruction**: Cannot pull or store full conversation history
+
+**Functional Requirements**:
+
+- [ ] **Stability**: Thoroughly tested, no crashes or errors
+- [ ] **Clear Error Messages**: User-friendly fallbacks for failures
+- [ ] **Responsive**: Low latency (<500ms tool calls)
+- [ ] **As Described**: Functions exactly as metadata describes
+- [ ] **No Hidden Actions**: Transparent about all operations
+
+**Design Compliance** (Apps SDK):
+
+- [ ] **System Fonts**: Inherits ChatGPT typography (no custom fonts)
+- [ ] **System Colors**: Uses system palettes (branding via logos only)
+- [ ] **Inline Actions**: Max 2 primary buttons in inline mode
+- [ ] **No Internal Scrolling**: Inline cards auto-fit content
+- [ ] **Accessible**: Keyboard navigation, screen reader support
+
+**OAuth & Security**:
+
+- [ ] **OAuth 2.1**: Discovery endpoints implemented
+- [ ] **JWKS**: Public keys exposed for token verification
+- [ ] **Scopes**: Per-tool security declarations
+- [ ] **Transparent Login**: Clear permission requests
+- [ ] **No Machine-to-Machine**: All requests are user sessions
+
+**Post-Approval**:
+
+- ⚠️ **Metadata Locked**: Tool names/signatures cannot change without resubmission
+- ⚠️ **Ongoing Compliance**: Violations lead to removal
+- ⚠️ **Support Responsiveness**: Must respond to user reports
+
+**Rejection Reasons to Avoid**:
+- Beta/demo quality
+- Misleading descriptions
+- Custom fonts or non-system colors
+- More than 2 actions in inline cards
+- Prohibited data collection
+- Poor error handling
+- Missing OAuth endpoints
+
+---
+
+### 🧪 ChatGPT Integration Testing
+
+**Mock window.openai API**:
+```typescript
+// tests/mocks/openai-api.ts
+export const mockOpenAi = {
+  toolOutput: { task: { id: "123", title: "Test task", priority: 5 } },
+  theme: "light",
+  locale: "en-US",
+
+  callTool: jest.fn(async (name, params) => {
+    // Simulate MCP server response
+    return { success: true };
+  }),
+
+  setWidgetState: jest.fn((widgetId, state) => {
+    // Store state in mock
+  }),
+
+  getWidgetState: jest.fn((widgetId) => {
+    return { filter: "high-priority" };
+  }),
+
+  requestDisplayMode: jest.fn((mode) => {
+    console.log(`Display mode requested: ${mode}`);
+  })
+};
+
+// Inject into window
+(global as any).window = { openai: mockOpenAi };
+```
+
+**Integration Test Example**:
+```typescript
+import { render, fireEvent, waitFor } from '@testing-library/react';
+import TaskCard from '../components/TaskCard';
+import { mockOpenAi } from './mocks/openai-api';
+
+test('complete button calls MCP tool and updates state', async () => {
+  const { getByText } = render(<TaskCard />);
+
+  const completeButton = getByText('Complete');
+  fireEvent.click(completeButton);
+
+  await waitFor(() => {
+    expect(mockOpenAi.callTool).toHaveBeenCalledWith(
+      'mindflow.complete_task',
+      { taskId: '123' }
+    );
+  });
+
+  expect(mockOpenAi.setWidgetState).toHaveBeenCalledWith(
+    'task-card-123',
+    { completed: true }
+  );
+});
 ```
 
 ---
