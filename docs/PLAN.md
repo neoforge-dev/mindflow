@@ -699,8 +699,598 @@ tests/frontend/
 
 ---
 
-**Version**: 8.0.0
+**Version**: 9.0.0
 **Philosophy**: First Principles + Pareto Principle
 **Mantra**: "Ship working software that delivers business value"
+
+---
+
+## 🎨 PHASE 9: OPENAI APPS SDK INTEGRATION (Post-Launch Enhancement)
+
+**Timeline**: 1 week (after Phase 8C deployment)
+**Effort**: 28-32 hours
+**Business Value**: Enhanced ChatGPT UX with interactive task cards
+**Trigger**: Launch complete + initial user feedback positive
+
+### Why Apps SDK?
+
+**First Principles Analysis**:
+- **Current**: Text-based responses in ChatGPT (works great, 80% of value)
+- **Enhancement**: Visual task cards with inline actions (adds 20% more delight)
+- **User Pain**: "I want to complete tasks without leaving the chat"
+
+**Value Proposition**:
+- Interactive task cards render inline in ChatGPT
+- Visual priority indicators (color-coded badges)
+- One-click actions (complete, snooze, reschedule)
+- State persistence across conversation turns
+
+### 9A: MCP Server + React Components (5 days, 28 hours)
+
+**Status**: PLANNED (build after Phase 8C deployment)
+
+#### Architecture Overview
+
+```
+ChatGPT Conversation
+  ↓ (user asks "what should I work on?")
+GPT calls MCP tool: "getBestTask"
+  ↓
+MCP Server (Node.js/Python)
+  ↓ (proxies to)
+FastAPI Backend (localhost:8000 or production)
+  ↓ (returns)
+{
+  "task": {...},
+  "_meta": {
+    "openai/outputTemplate": "task-card" // Triggers React component
+  }
+}
+  ↓
+ChatGPT renders React component
+  ↓
+User sees interactive task card
+```
+
+#### Files to Create
+
+**Frontend (React + TypeScript)**:
+```
+frontend/apps-sdk/
+├── src/
+│   ├── components/
+│   │   ├── TaskCard.tsx                    # Main task display component
+│   │   ├── TaskList.tsx                    # Multiple tasks view
+│   │   ├── PriorityBadge.tsx              # Visual priority indicator
+│   │   ├── TaskActions.tsx                # Complete/snooze/reschedule buttons
+│   │   └── EmptyState.tsx                 # No tasks state
+│   ├── services/
+│   │   ├── openai-client.ts               # window.openai wrapper
+│   │   └── state-manager.ts               # Component state persistence
+│   ├── types/
+│   │   └── task.ts                        # Task type definitions
+│   ├── App.tsx                            # Root component
+│   └── index.tsx                          # Entry point
+├── package.json                           # React 18+, TypeScript, Tailwind
+├── tsconfig.json                          # TypeScript config
+├── vite.config.ts                         # Build with Vite
+└── tailwind.config.js                     # Styling
+```
+
+**MCP Server (connects ChatGPT to FastAPI)**:
+```
+mcp-server/
+├── src/
+│   ├── server.ts                          # MCP server entry point
+│   ├── tools/
+│   │   ├── getBestTask.ts                 # GET /api/tasks/best
+│   │   ├── createTask.ts                  # POST /api/tasks
+│   │   ├── completeTask.ts                # PUT /api/tasks/{id} (status=completed)
+│   │   ├── snoozeTask.ts                  # PUT /api/tasks/{id} (snoozed_until)
+│   │   ├── rescheduleTask.ts              # PUT /api/tasks/{id} (due_date)
+│   │   └── getPendingTasks.ts             # GET /api/tasks/pending
+│   ├── config.ts                          # Backend URL, auth config
+│   └── types.ts                           # MCP tool schemas
+├── package.json                           # @modelcontextprotocol/sdk
+├── tsconfig.json
+└── README.md                              # Setup instructions
+```
+
+**Tests**:
+```
+tests/apps-sdk/
+├── components/
+│   ├── TaskCard.test.tsx                  # Component rendering tests
+│   ├── TaskActions.test.tsx               # Button interaction tests
+│   └── integration.test.tsx               # Full flow tests
+├── mcp/
+│   ├── server.test.ts                     # MCP server tests
+│   └── tools.test.ts                      # Tool invocation tests
+└── e2e/
+    └── chatgpt-flow.test.ts               # End-to-end ChatGPT test
+```
+
+#### Component Functions
+
+**TaskCard.tsx**:
+```typescript
+function TaskCard(props: TaskCardProps): JSX.Element
+// Renders interactive task card with priority badge, title, due date, and action buttons.
+// Handles state updates via window.openai.setWidgetState().
+
+function formatDueDate(dueDate: string): string
+// Converts ISO date to human-readable format ("Due in 2 hours", "Tomorrow", etc.).
+
+function getPriorityColor(priority: number): string
+// Maps priority (1-5) to Tailwind color class (red-500, orange-400, etc.).
+```
+
+**TaskActions.tsx**:
+```typescript
+async function handleCompleteTask(taskId: string): Promise<void>
+// Calls window.openai.callTool("completeTask", {taskId}), updates local state, shows success toast.
+
+async function handleSnoozeTask(taskId: string, duration: "1h" | "tomorrow"): Promise<void>
+// Calculates snooze time, calls MCP tool, removes task from view temporarily.
+
+async function handleReschedule(taskId: string, newDate: string): Promise<void>
+// Opens date picker, calls rescheduleTask tool, updates card display.
+```
+
+**openai-client.ts**:
+```typescript
+async function callTool(toolName: string, params: object): Promise<any>
+// Wraps window.openai.callTool with error handling, retry logic, and loading states.
+
+async function saveWidgetState(state: object): Promise<void>
+// Persists component state using window.openai.setWidgetState for conversation continuity.
+
+function subscribeToThemeChanges(callback: (theme: "light" | "dark") => void): void
+// Listens to ChatGPT theme changes, updates component styling accordingly.
+```
+
+#### MCP Server Functions
+
+**server.ts**:
+```typescript
+async function startMCPServer(port: number = 3000): Promise<void>
+// Initializes MCP server, registers tools, connects to FastAPI backend via HTTP client.
+
+function registerTools(server: MCPServer): void
+// Registers all task management tools (getBestTask, createTask, etc.) with their schemas.
+```
+
+**tools/getBestTask.ts**:
+```typescript
+async function getBestTaskTool(params: {}, context: ToolContext): Promise<ToolResult>
+// Calls GET /api/tasks/best, returns task with _meta.openai/outputTemplate = "task-card".
+
+function formatTaskForWidget(task: Task): object
+// Transforms FastAPI task response into Apps SDK widget format with metadata.
+```
+
+**tools/completeTask.ts**:
+```typescript
+async function completeTaskTool(params: {taskId: string}, context: ToolContext): Promise<ToolResult>
+// Calls PUT /api/tasks/{taskId} with status=completed, returns success message and updated task list.
+```
+
+#### Test Cases
+
+**Component Tests**:
+```typescript
+test_task_card_renders_with_priority_5_as_red_badge
+// Verifies priority 5 tasks display red badge with "Urgent" label
+
+test_complete_button_calls_mcp_tool_and_removes_card
+// Simulates button click, mocks callTool, asserts card disappears
+
+test_due_date_formats_correctly_for_overdue_tasks
+// Checks "Overdue by 2 hours" displays for past due dates
+
+test_state_persists_across_component_remounts
+// Saves state, unmounts component, remounts, verifies state restored
+
+test_dark_mode_theme_applies_correct_colors
+// Toggles theme, asserts Tailwind dark: classes active
+```
+
+**MCP Server Tests**:
+```typescript
+test_mcp_server_starts_and_listens_on_port_3000
+// Starts server, verifies HTTP endpoint accessible
+
+test_get_best_task_tool_returns_valid_widget_metadata
+// Invokes getBestTask, asserts _meta.openai/outputTemplate present
+
+test_complete_task_tool_updates_backend_via_fastapi
+// Mocks FastAPI PUT request, verifies status=completed sent
+
+test_mcp_server_handles_backend_500_errors_gracefully
+// Simulates FastAPI error, verifies user-friendly error message returned
+
+test_authentication_token_passed_to_fastapi_requests
+// Verifies JWT token from ChatGPT user forwarded to backend
+```
+
+**End-to-End Tests**:
+```typescript
+test_full_flow_ask_gpt_see_card_complete_task
+// Simulates: ChatGPT message → MCP call → FastAPI → widget render → button click → backend update
+
+test_multiple_tasks_render_as_scrollable_list
+// Requests pending tasks, verifies TaskList component renders 10+ cards
+
+test_error_recovery_when_backend_unreachable
+// Disconnects backend, verifies fallback message displayed in ChatGPT
+```
+
+---
+
+## 🎨 PHASE 9B: LANDING PAGE ENHANCEMENT (Post-Apps SDK)
+
+**Timeline**: 2 days (after Apps SDK complete)
+**Effort**: 8 hours
+**Business Value**: Showcase interactive UX, increase conversion
+
+### Current State
+- ✅ `frontend/index.html` exists (17KB, Phase 8B)
+- ✅ Animated ChatGPT conversation demo
+- ✅ Dual CTAs to Custom GPT
+- ✅ Mobile responsive
+
+### Enhancement Plan
+
+**What to Add**:
+1. **Apps SDK Screenshots**: Show interactive task cards in ChatGPT
+2. **Feature Comparison**: Text-based vs interactive UX
+3. **Video Demo**: 30-second screen recording of Apps SDK in action
+4. **Updated CTA**: "Try Interactive Task Cards in ChatGPT"
+
+**Files to Modify**:
+```
+frontend/index.html                        # Add Apps SDK section
+frontend/assets/
+  ├── screenshots/
+  │   ├── task-card-demo.png              # Interactive card screenshot
+  │   ├── complete-action.gif             # Button click animation
+  │   └── chatgpt-integration.mp4         # Video demo
+  └── styles/
+      └── animations.css                   # New animations for demos
+```
+
+#### Functions to Add
+
+**index.html** (JavaScript inline):
+```javascript
+function playVideoOnScroll(videoElement: HTMLVideoElement): void
+// Plays video demo when scrolled into viewport using IntersectionObserver.
+
+function trackCTAClick(ctaType: "hero" | "footer" | "apps-sdk"): void
+// Sends analytics event (via Plausible) when CTA clicked, differentiates button types.
+
+function toggleFeatureComparison(view: "text" | "interactive"): void
+// Switches between text-based and Apps SDK demo views using CSS classes.
+```
+
+#### Sections to Update
+
+**Hero Section** (update):
+```html
+<h1>Your AI Task Manager Lives in ChatGPT</h1>
+<p>Interactive task cards with one-click actions. No app switching.</p>
+<a href="..." class="cta-button">
+  Try Interactive Cards in ChatGPT →
+</a>
+```
+
+**New Section: Apps SDK Demo**:
+```html
+<section class="apps-sdk-demo">
+  <h2>See It in Action</h2>
+  <div class="demo-grid">
+    <div class="demo-text">
+      <p>Ask: "What should I work on?"</p>
+      <p>Get visual task cards with inline actions</p>
+    </div>
+    <div class="demo-visual">
+      <video autoplay loop muted playsinline>
+        <source src="assets/chatgpt-integration.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+```
+
+**Feature Comparison Table**:
+```html
+<section class="comparison">
+  <table>
+    <tr>
+      <th>Feature</th>
+      <th>Text Mode</th>
+      <th>Interactive Cards</th>
+    </tr>
+    <tr>
+      <td>Get recommendations</td>
+      <td>✅</td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td>Visual priority</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td>One-click complete</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+  </table>
+</section>
+```
+
+#### Tests to Add
+
+```javascript
+test_apps_sdk_section_renders_above_fold
+// Verifies Apps SDK demo visible without scrolling on desktop
+
+test_video_auto_plays_when_scrolled_into_view
+// Simulates scroll, asserts video.play() called
+
+test_feature_comparison_toggle_switches_views
+// Clicks toggle, verifies correct demo visible
+
+test_cta_tracking_fires_different_events
+// Clicks each CTA, verifies unique analytics events sent
+
+test_mobile_video_displays_poster_image_not_autoplay
+// On mobile viewport, asserts video has poster, no autoplay
+```
+
+---
+
+## 🖥️ PHASE 11: FULL WEB FRONTEND (Future - User Demand Driven)
+
+**Timeline**: 4-6 weeks (if 100+ users request it)
+**Effort**: 160-240 hours
+**Business Value**: Serve non-ChatGPT users, power user features
+**Trigger**: 100+ support requests for "web access" or "standalone app"
+
+### Why Deferred?
+
+**First Principles**:
+- **Core Mission**: Task recommendations via ChatGPT
+- **Apps SDK**: Provides full functionality IN ChatGPT
+- **Web Frontend**: Only needed for minority use cases
+
+**Pareto Analysis**:
+- **Apps SDK**: 20% effort, 60% value (enhances core)
+- **Web Frontend**: 80% effort, 20% value (serves edge cases)
+
+**Decision**: Build ONLY if users explicitly ask for it.
+
+### When to Build
+
+**Triggers**:
+1. 100+ users request "I want to manage tasks without ChatGPT"
+2. Enterprise customers need team collaboration (not possible in GPT)
+3. Offline access required (PWA for mobile)
+4. Advanced filtering/reporting needed (beyond ChatGPT capabilities)
+
+### Architecture (Based on archived design)
+
+**Tech Stack**:
+- **Frontend**: LIT web components (50KB bundle)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS + custom design tokens
+- **Build**: Vite
+- **State**: Context API + local storage
+- **Real-time**: WebSocket connection to FastAPI
+- **Deployment**: Cloudflare Pages (same as landing page)
+
+**Files to Create** (from `docs/archive/custom-views-todoist-ui.md`):
+
+```
+frontend/web-app/
+├── src/
+│   ├── components/
+│   │   ├── upcoming-view.ts              # Main view (1,323 lines from archive)
+│   │   ├── week-navigator.ts             # Horizontal calendar
+│   │   ├── task-card.ts                  # Individual task display
+│   │   ├── task-filters.ts               # Filtering UI
+│   │   └── app-shell.ts                  # Navigation shell
+│   ├── services/
+│   │   ├── task-service.ts               # API client (FastAPI)
+│   │   ├── websocket.ts                  # Real-time sync
+│   │   └── auth-service.ts               # Login/logout
+│   ├── types/
+│   │   └── api.ts                        # TypeScript types
+│   ├── styles/
+│   │   └── main.css                      # Tailwind + custom styles
+│   └── main.ts                           # App entry point
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── index.html                            # SPA shell
+```
+
+#### Core Components (from archive)
+
+**upcoming-view.ts** (Main View):
+```typescript
+class UpcomingView extends LitElement
+// Displays week navigator + date-grouped task list with sticky headers.
+// Handles drag-drop rescheduling, swipe gestures, real-time updates via WebSocket.
+
+async function loadTasks(): Promise<void>
+// Fetches pending tasks from FastAPI, groups by date, sorts by priority.
+
+function groupTasksByDate(): void
+// Maps tasks to date buckets (Today, Tomorrow, Mon Oct 31, etc.), stores in Map.
+
+function setupRealTimeSync(): void
+// Subscribes to WebSocket events (task_created, task_updated, task_deleted), updates UI.
+```
+
+**week-navigator.ts**:
+```typescript
+class WeekNavigator extends LitElement
+// Horizontal scrolling calendar showing 7 days with task count indicators.
+
+function generateWeeks(): void
+// Creates Date[] for current week + 2 weeks ahead, enables infinite scroll.
+
+function isToday(date: Date): boolean
+// Highlights current day with active styling.
+```
+
+**task-card.ts**:
+```typescript
+class TaskCard extends LitElement
+// Renders draggable task card with priority badge, title, due date, tags, swipe actions.
+
+function handleDragStart(event: DragEvent): void
+// Captures task ID in dataTransfer, adds dragging class for visual feedback.
+
+async function handleCompleteTask(): Promise<void>
+// Calls PUT /api/tasks/{id} with status=completed, dispatches event to parent.
+```
+
+#### Gesture Support
+
+**Drag-Drop Rescheduling**:
+```typescript
+function setupDragDrop(): void
+// Attaches dragover/drop listeners to date groups, updates task.due_date on drop.
+
+async function rescheduleTask(taskId: string, newDate: string): Promise<void>
+// Calls FastAPI PUT endpoint, optimistically updates UI, rolls back on error.
+```
+
+**Swipe Actions** (mobile):
+```typescript
+function setupGestureDetection(): void
+// Detects horizontal swipes (touchstart/touchmove), reveals action buttons (complete, snooze).
+
+function handleSwipeRight(taskElement: HTMLElement): void
+// Marks task complete via API, animates card removal.
+```
+
+#### Real-Time Sync
+
+**websocket.ts**:
+```typescript
+class WebSocketClient
+// Connects to ws://localhost:8000/ws/tasks, handles reconnection with exponential backoff.
+
+function handleMessage(message: WebSocketMessage): void
+// Parses event type (task_updated, etc.), triggers callbacks, updates component state.
+
+function attemptReconnect(): void
+// Retries connection up to 5 times with increasing delay (1s, 2s, 4s, 8s, 16s).
+```
+
+#### Tests
+
+```typescript
+test_upcoming_view_groups_tasks_by_date_correctly
+// Creates 10 tasks across 5 days, verifies 5 date groups rendered
+
+test_week_navigator_highlights_today_with_active_class
+// Asserts today's date has .active class, tomorrow does not
+
+test_drag_task_to_tomorrow_updates_due_date
+// Simulates drag from Today to Tomorrow, verifies API called with new date
+
+test_swipe_right_completes_task_and_removes_card
+// Simulates touch gesture, asserts task marked completed, card animates out
+
+test_websocket_task_updated_event_refreshes_card
+// Sends mock WebSocket message, verifies task card re-renders with new data
+
+test_empty_state_displays_when_no_tasks_pending
+// Clears task list, asserts "No tasks" message and emoji displayed
+
+test_virtual_scrolling_handles_500_tasks_smoothly
+// Creates 500 tasks, verifies only visible cards rendered (performance test)
+```
+
+### Implementation Phases (if triggered)
+
+**Phase 11A: Core Views** (2 weeks):
+- Upcoming view with week navigator
+- Task cards with basic actions
+- Basic filtering (priority, status)
+
+**Phase 11B: Advanced Interactions** (1 week):
+- Drag-drop rescheduling
+- Swipe gestures
+- Keyboard shortcuts
+
+**Phase 11C: Real-Time Sync** (1 week):
+- WebSocket integration
+- Optimistic updates
+- Conflict resolution
+
+**Phase 11D: Polish** (1-2 weeks):
+- Empty states, loading states
+- Error handling, offline mode
+- Accessibility (WCAG AA)
+- Performance optimization (virtual scrolling)
+
+---
+
+## 📋 UPDATED IMPLEMENTATION ROADMAP
+
+### ✅ COMPLETE
+- Phase 1-7: Backend API, database, auth, scoring, CI/CD
+- Phase 8A: Enhanced authentication (password reset, refresh tokens)
+- Phase 8B: Landing page (text-based ChatGPT focus)
+
+### 🔄 IN PROGRESS
+- **Phase 8C: Production Deployment** (IMMEDIATE - 2 days)
+  - Deploy FastAPI to DigitalOcean
+  - Migrate Custom GPT to production
+  - Setup monitoring
+
+### 📅 PLANNED (Post-Launch)
+- **Phase 9A: OpenAI Apps SDK** (Week 3 - 5 days, 28 hours)
+  - React task card components
+  - MCP server integration
+  - Interactive ChatGPT UX
+
+- **Phase 9B: Landing Page Enhancement** (Week 4 - 2 days, 8 hours)
+  - Apps SDK screenshots/video
+  - Feature comparison table
+  - Updated CTAs
+
+- **Phase 11: Web Frontend** (DEFERRED - 4-6 weeks, IF requested)
+  - Full LIT-based web app
+  - Todoist-style UI
+  - Real-time sync
+
+---
+
+## 🎯 DECISION TREE
+
+```
+Launch MindFlow?
+├─ YES → Phase 8C: Deploy (2 days) → Get 10-100 users
+│   └─ Users love it?
+│       ├─ YES → Phase 9A: Apps SDK (5 days) → Enhanced UX
+│       │   └─ 50+ users request web access?
+│       │       ├─ YES → Phase 11: Build web app (6 weeks)
+│       │       └─ NO → Done, iterate on Apps SDK
+│       └─ NO → Pivot or shut down
+└─ NO → Keep planning forever (not recommended 😉)
+```
+
+---
+
+**Version**: 9.0.0
+**Philosophy**: First Principles + Pareto Principle + User Demand
+**Mantra**: "Ship, learn, iterate. Build what users actually want."
 
 Let's ship it. 🚀
