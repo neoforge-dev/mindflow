@@ -25,6 +25,7 @@ dependencies = [
     "structlog>=24.1.0",
     "sentry-sdk>=1.40.0",
     "alembic>=1.13.0",
+    "cryptography>=46.0.3",
 ]
 
 [project.optional-dependencies]
