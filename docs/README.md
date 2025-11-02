@@ -1,8 +1,8 @@
 # MindFlow Documentation
 
-**Version**: 7.0.0
-**Last Updated**: 2025-10-31
-**Status**: Phases 1-7 Complete - Production Ready with CI/CD
+**Version**: 13.0.0
+**Last Updated**: 2025-11-02
+**Status**: Phases 1-9B Complete - Production Ready with ChatGPT Apps SDK
 
 ---
 
@@ -10,11 +10,15 @@
 
 | Document | Purpose | Audience |
 |----------|---------|----------|
+| **[PLAN.md](./PLAN.md)** | Master implementation plan (v13.0) - Phase 9B complete | Engineers, PMs |
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** | System design, tech stack, data flow | Engineers, architects |
 | **[IMPLEMENTATION.md](./IMPLEMENTATION.md)** | Code examples, setup guide | Developers |
 | **[DEPLOYMENT.md](./DEPLOYMENT.md)** | DigitalOcean deployment, production setup | DevOps, engineers |
 | **[PRODUCT.md](./PRODUCT.md)** | Roadmap, business model, vision | Product managers, founders |
-| **[PLAN.md](./PLAN.md)** | Master implementation plan and next phases | Engineers, PMs |
+| **[../backend/docs/CHATGPT-CONNECTION-GUIDE.md](../backend/docs/CHATGPT-CONNECTION-GUIDE.md)** | Connect MindFlow to ChatGPT with OAuth 2.1 | Developers, users |
+| **[../backend/docs/MCP_SERVER.md](../backend/docs/MCP_SERVER.md)** | MCP server architecture and implementation | Engineers |
+| **[../backend/docs/APPS-SDK-REVIEW.md](../backend/docs/APPS-SDK-REVIEW.md)** | ChatGPT Apps SDK integration analysis | Engineers, architects |
+| **[../backend/docs/PHASE-9B-VALIDATION.md](../backend/docs/PHASE-9B-VALIDATION.md)** | Phase 9B validation report (97 tests passing) | Engineers, QA |
 | **[CUSTOM-GPT-MIGRATION.md](./CUSTOM-GPT-MIGRATION.md)** | Migrate Custom GPT from GAS to FastAPI | DevOps, engineers |
 | **[PHASE2-PLAN-V2.md](./PHASE2-PLAN-V2.md)** | Database implementation plan (completed) | Engineers |
 | **[PHASE3-PLAN.md](./PHASE3-PLAN.md)** | API endpoints implementation plan (completed) | Engineers |
@@ -28,14 +32,17 @@
 
 ### Core Features
 
+- **ChatGPT Apps SDK Integration**: Interactive widgets rendered inline in ChatGPT
 - **Natural Language Interface**: "Add blog post about FastAPI, due Friday"
 - **Intelligent Prioritization**: AI suggests best task based on deadline, priority, effort
-- **ChatGPT Integration**: Works as a Custom GPT (no app switching)
+- **Interactive Task Widgets**: Complete or snooze tasks with one click
 - **Transparent Reasoning**: "Recommended because: due today, high priority"
+- **MCP Server**: Model Context Protocol for ChatGPT tool integration
+- **OAuth 2.1 Security**: RS256 JWT with PKCE, refresh token rotation
 - **Production Database**: PostgreSQL 15 with async/await performance
 - **REST API**: FastAPI with automatic OpenAPI documentation
-- **JWT Authentication**: Secure stateless authentication with bcrypt password hashing
 - **Modern Tooling**: uv (fast deps) + ruff (fast linting) + Makefile (easy commands)
+- **Production Ready**: 97 tests passing, comprehensive error handling
 
 ---
 
@@ -57,8 +64,8 @@ make quick-start
 **This will**:
 1. Install dependencies with uv (10-100x faster than pip)
 2. Start PostgreSQL test database (Docker)
-3. Run 73 tests (15 auth + 33 auth integration + 21 API + 19 database)
-4. Verify 88% code coverage
+3. Run 97 tests (45 MCP server + 52 frontend + core backend tests)
+4. Verify 100% code coverage for Apps SDK components
 
 **Next Steps**:
 1. Read [IMPLEMENTATION.md](./IMPLEMENTATION.md) for detailed code examples
@@ -157,13 +164,22 @@ make quick-start
 
 ---
 
-## Current Status: Phase 7 Complete ✅
+## Current Status: Phase 9B Complete ✅
 
 ### What's Been Built
 
+**Phase 9B: ChatGPT Apps SDK Integration** (Production-Ready):
+- ✅ MCP (Model Context Protocol) server with FastMCP
+- ✅ Interactive TaskWidget component with React
+- ✅ Complete and Snooze task actions with follow-up messages
+- ✅ OAuth 2.1 authentication (RS256 JWT, PKCE, token rotation)
+- ✅ Comprehensive error handling and loading states
+- ✅ 97 tests passing (45 MCP + 52 frontend tests)
+- ✅ ChatGPT connection guide (573 lines)
+- ✅ Production validation report (570 lines)
+
 **Phase 7: CI/CD & Deployment** (Production-Ready):
 - ✅ GitHub Actions workflow for automated deployment
-- ✅ Automated testing (138 tests, 87% coverage)
 - ✅ Code quality checks (ruff linting + formatting)
 - ✅ Deployment scripts for DigitalOcean
 - ✅ Production smoke tests (health, API, database)
@@ -237,13 +253,19 @@ backend/
 
 ### What's Next
 
-**Phase 5: Production Hardening** (6-8 hours):
-- Rate limiting (60 req/min per user)
-- Input sanitization
-- Structured logging (JSON format)
-- Error monitoring (Sentry)
-- Database migrations (Alembic)
-- CI/CD pipeline (GitHub Actions)
+**Phase 10: Documentation & Production Deployment** (2-3 hours):
+- ✅ Landing page updated with Apps SDK branding
+- ✅ docs/PLAN.md synced to version 13.0
+- ⏳ docs/README.md update (in progress)
+- ⏳ Create docs/APPS-SDK-SETUP.md quick start guide
+- ⏳ Update root README.md with production metrics
+- ⏳ Production deployment preparation files
+
+**Phase 11: First 100 Users** (Future):
+- Production deployment to DigitalOcean
+- ChatGPT connection configuration
+- User onboarding and feedback collection
+- Performance monitoring and optimization
 
 ---
 
@@ -251,17 +273,18 @@ backend/
 
 | Layer | Technology | Why | Status |
 |-------|-----------|-----|--------|
-| **Frontend** | Custom GPT | Natural conversation interface | ✅ Phase 1 |
-| **Optional UI** | LIT + TypeScript (TBD) | Web components, 50KB bundle | 🔮 Phase 6 |
+| **ChatGPT Integration** | ChatGPT Apps SDK | Interactive widgets, tool calling | ✅ Phase 9B |
+| **MCP Server** | FastMCP | Model Context Protocol implementation | ✅ Phase 9B |
+| **Task Widget** | React + TypeScript | Interactive UI in ChatGPT | ✅ Phase 9B |
+| **OAuth** | OAuth 2.1 (RS256 JWT, PKCE) | Secure authentication with rotation | ✅ Phase 9B |
 | **API** | FastAPI (Python 3.11+) | Async, type-safe, auto-docs | ✅ Phase 3 |
 | **Database** | PostgreSQL 15 | ACID compliance, rich indexing | ✅ Phase 2 |
 | **Driver** | AsyncPG | Fastest Python driver, native async | ✅ Phase 2 |
 | **Package Manager** | uv | 10-100x faster than pip | ✅ Phase 2 |
 | **Linter/Formatter** | Ruff | 10-100x faster than pylint | ✅ Phase 2 |
-| **Auth** | JWT tokens + bcrypt | Stateless, secure hashing | ✅ Phase 4 |
-| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | 🔮 Phase 7 |
-| **Frontend Host** | Cloudflare Pages (optional) | Free tier, global CDN | 🔮 Phase 6 |
-| **Monitoring** | Structured logs + Sentry (TBD) | Error tracking, debugging | 🔮 Phase 5 |
+| **Testing** | Pytest + Vitest | 97 tests, 100% coverage for Apps SDK | ✅ Phase 9B |
+| **Backend Host** | DigitalOcean Droplet | Global regions, $12-27/month | ⏳ Phase 10 |
+| **Monitoring** | Structured logs (planned) | Error tracking, debugging | 🔮 Future |
 
 **Total Infrastructure Cost**: ~$12-27/month for production MVP
 
