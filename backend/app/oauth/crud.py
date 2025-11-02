@@ -8,7 +8,7 @@ from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.oauth.models import OAuthAuthorizationCode, OAuthClient
+from app.oauth.models import OAuthAuthorizationCode, OAuthClient, OAuthRefreshToken
 
 
 class OAuthClientCRUD:
@@ -170,6 +170,119 @@ class OAuthAuthorizationCodeCRUD:
                 return auth_code
 
             return None
+        except Exception:
+            await session.rollback()
+            raise
+
+
+class OAuthRefreshTokenCRUD:
+    """OAuth refresh token database operations."""
+
+    @staticmethod
+    async def create(
+        session: AsyncSession,
+        client_id: str,
+        user_id: int,
+        scope: str,
+        expires_delta: timedelta = timedelta(days=90),
+    ) -> OAuthRefreshToken:
+        """
+        Create new refresh token for OAuth flow.
+
+        Args:
+            session: Database session
+            client_id: OAuth client ID
+            user_id: User ID who authorized
+            scope: Granted scopes (space-separated)
+            expires_delta: Token expiration duration (default: 90 days)
+
+        Returns:
+            Created OAuthRefreshToken object with secure token
+        """
+        try:
+            # Generate cryptographically secure refresh token
+            token = secrets.token_urlsafe(64)
+
+            refresh_token = OAuthRefreshToken(
+                token=token,
+                client_id=client_id,
+                user_id=user_id,
+                scope=scope,
+                is_active=True,
+                expires_at=datetime.now(UTC) + expires_delta,
+            )
+
+            session.add(refresh_token)
+            await session.commit()
+            await session.refresh(refresh_token)
+            return refresh_token
+        except Exception:
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_by_token(session: AsyncSession, token: str) -> OAuthRefreshToken | None:
+        """Find refresh token by token value."""
+        result = await session.execute(
+            select(OAuthRefreshToken).where(OAuthRefreshToken.token == token)
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def validate_and_get(
+        session: AsyncSession, token: str, client_id: str
+    ) -> OAuthRefreshToken | None:
+        """
+        Validate refresh token and return if valid.
+
+        Args:
+            session: Database session
+            token: Refresh token to validate
+            client_id: Client ID from token request
+
+        Returns:
+            OAuthRefreshToken if valid and active, None otherwise
+        """
+        now = datetime.now(UTC)
+
+        result = await session.execute(
+            select(OAuthRefreshToken).where(
+                and_(
+                    OAuthRefreshToken.token == token,
+                    OAuthRefreshToken.client_id == client_id,
+                    OAuthRefreshToken.is_active == True,  # noqa: E712
+                    OAuthRefreshToken.expires_at > now,
+                )
+            )
+        )
+
+        return result.scalars().first()
+
+    @staticmethod
+    async def revoke(session: AsyncSession, token: str) -> bool:
+        """
+        Revoke a refresh token.
+
+        Args:
+            session: Database session
+            token: Refresh token to revoke
+
+        Returns:
+            True if token was revoked, False if not found
+        """
+        try:
+            result = await session.execute(
+                select(OAuthRefreshToken).where(OAuthRefreshToken.token == token)
+            )
+            refresh_token = result.scalars().first()
+
+            if refresh_token:
+                refresh_token.is_active = False
+                refresh_token.revoked_at = datetime.now(UTC)
+                await session.commit()
+                return True
+
+            return False
         except Exception:
             await session.rollback()
             raise

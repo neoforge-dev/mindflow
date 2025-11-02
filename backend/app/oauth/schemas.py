@@ -100,3 +100,34 @@ class ConsentDecision(BaseModel):
 
     # CSRF protection
     csrf_token: str = Field(..., description="CSRF token for form validation", min_length=1)
+
+
+class TokenRequest(BaseModel):
+    """OAuth 2.1 Token Request (RFC 6749 Section 4.1.3)."""
+
+    grant_type: str = Field(..., description="Grant type: authorization_code or refresh_token")
+    code: str | None = Field(None, description="Authorization code (required for authorization_code grant)")
+    redirect_uri: str | None = Field(None, description="Redirect URI (required for authorization_code grant)")
+    client_id: str = Field(..., description="OAuth client ID", min_length=1)
+    client_secret: str = Field(..., description="OAuth client secret", min_length=1)
+    code_verifier: str | None = Field(
+        None, description="PKCE code verifier (required for authorization_code grant)", min_length=43, max_length=128
+    )
+    refresh_token: str | None = Field(None, description="Refresh token (required for refresh_token grant)")
+
+
+class TokenResponse(BaseModel):
+    """OAuth 2.1 Token Response (RFC 6749 Section 5.1)."""
+
+    access_token: str = Field(..., description="JWT access token")
+    token_type: str = Field(default="Bearer", description="Token type (always Bearer)")
+    expires_in: int = Field(..., description="Token expiration time in seconds")
+    refresh_token: str | None = Field(None, description="Refresh token for obtaining new access tokens")
+    scope: str = Field(..., description="Granted scopes (space-separated)")
+
+
+class TokenErrorResponse(BaseModel):
+    """OAuth 2.1 Token Error Response (RFC 6749 Section 5.2)."""
+
+    error: str = Field(..., description="Error code")
+    error_description: str | None = Field(None, description="Human-readable error description")
