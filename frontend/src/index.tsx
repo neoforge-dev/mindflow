@@ -1,28 +1,12 @@
 /**
- * ChatGPT Apps SDK entry point
- * Exports MindFlow task components for use in ChatGPT interface
+ * MindFlow Apps SDK - Entry Point
+ *
+ * Clean ChatGPT Apps SDK integration
  */
 
 // Export main component
-export { TaskCard, default as TaskCardDefault } from './components/TaskCard';
+export { TaskWidget } from './components/TaskWidget';
 
-// Export types for external usage
-export type {
-  Task,
-  TaskPriority,
-  TaskStatus,
-  TaskReasoning,
-  NextTaskResponse,
-  TaskCardProps,
-} from './types/Task';
-
-// Export utilities for external usage
-export { formatDueDate, formatEffort, isOverdue } from './utils/dateFormat';
-export {
-  getPriorityColors,
-  getPriorityColorsLight,
-  getPriorityColorsDark,
-} from './utils/priorityColors';
-
-// Version info
-export const VERSION = '1.0.0';
+// Export SDK
+export { AppsSDK, getSDK, AppsSDKError } from './sdk/AppsSDK';
+export type { ToolOutput, CallToolOptions, WidgetState } from './sdk/AppsSDK';
