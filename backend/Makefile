@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-watch lint format check clean run migrate db-up db-down db-reset coverage
+.PHONY: help install install-dev test test-watch lint format check clean run migrate db-up db-down db-reset coverage mcp-server mcp-test
 
 # Default target
 .DEFAULT_GOAL := help
@@ -111,6 +111,17 @@ run-prod: ## Run the FastAPI production server
 
 shell: ## Open Python shell with app context
 	@uv run python -i -c "from app.db.database import *; from app.db.models import *; from app.db.crud import *"
+
+# MCP Server
+mcp-server: ## Run the MCP server for ChatGPT Apps SDK integration
+	@echo "$(BLUE)Starting MCP server...$(NC)"
+	@echo "$(GREEN)MCP Server will run on $(YELLOW)http://0.0.0.0:8001$(NC)"
+	@echo "$(GREEN)FastAPI backend: $(YELLOW)$(shell grep -E '^api_base_url' .env 2>/dev/null || echo 'http://localhost:8000')$(NC)"
+	uv run fastmcp run mcp_server.main:mcp --port 8001 --host 0.0.0.0
+
+mcp-test: ## Run MCP server tests
+	@echo "$(BLUE)Running MCP server tests...$(NC)"
+	uv run pytest tests/mcp_server/ -v --no-cov
 
 # Migrations (for Phase 3+)
 migrate: ## Run database migrations (alembic)
