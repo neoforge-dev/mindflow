@@ -5,7 +5,7 @@
  * No props, no fallbacks - ChatGPT only.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { getSDK } from '../sdk/AppsSDK';
 
 interface Task {
@@ -53,6 +53,50 @@ export const TaskWidget: React.FC = () => {
   const { task, score, reasoning } = useMemo(() => {
     return sdk.getToolOutput<TaskOutput>();
   }, []);
+
+  // State for button loading
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isSnoozing, setIsSnoozing] = useState(false);
+
+  // Handle complete task
+  const handleComplete = async () => {
+    try {
+      setIsCompleting(true);
+      await sdk.callTool({
+        name: 'complete_task',
+        arguments: { task_id: task.id },
+      });
+
+      // Send follow-up message
+      await window.openai!.sendFollowUpMessage({
+        prompt: `Task "${task.title}" completed! What should I work on next?`,
+      });
+    } catch (error) {
+      console.error('Failed to complete task:', error);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
+  // Handle snooze task
+  const handleSnooze = async (hours: number) => {
+    try {
+      setIsSnoozing(true);
+      await sdk.callTool({
+        name: 'snooze_task',
+        arguments: { task_id: task.id, hours },
+      });
+
+      // Send follow-up message
+      await window.openai!.sendFollowUpMessage({
+        prompt: `Task "${task.title}" snoozed for ${hours} hours. Show me the next task.`,
+      });
+    } catch (error) {
+      console.error('Failed to snooze task:', error);
+    } finally {
+      setIsSnoozing(false);
+    }
+  };
 
   // Format due date
   const dueDateText = useMemo(() => {
@@ -334,6 +378,58 @@ export const TaskWidget: React.FC = () => {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div
+        style={{
+          marginTop: '16px',
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          onClick={handleComplete}
+          disabled={isCompleting}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '120px',
+            padding: '10px 16px',
+            backgroundColor: isCompleting ? colors.border : colors.accent,
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: isCompleting ? 'not-allowed' : 'pointer',
+            opacity: isCompleting ? 0.6 : 1,
+            transition: 'all 0.2s',
+          }}
+        >
+          {isCompleting ? 'Completing...' : '✓ Complete Task'}
+        </button>
+
+        <button
+          onClick={() => handleSnooze(3)}
+          disabled={isSnoozing}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '120px',
+            padding: '10px 16px',
+            backgroundColor: isSnoozing ? colors.border : 'transparent',
+            color: isSnoozing ? colors.textSecondary : colors.text,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: isSnoozing ? 'not-allowed' : 'pointer',
+            opacity: isSnoozing ? 0.6 : 1,
+            transition: 'all 0.2s',
+          }}
+        >
+          {isSnoozing ? 'Snoozing...' : '⏰ Snooze 3h'}
+        </button>
       </div>
     </div>
   );

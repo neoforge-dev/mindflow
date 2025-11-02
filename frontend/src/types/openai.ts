@@ -61,6 +61,11 @@ export interface OpenAIGlobal {
   getWidgetState: () => Promise<Record<string, any> | null>;
 
   /**
+   * Send a follow-up message to continue the conversation
+   */
+  sendFollowUpMessage: (options: { prompt: string }) => Promise<void>;
+
+  /**
    * Render a custom component (for carousel/fullscreen modes)
    */
   render?: (component: React.ReactElement) => void;

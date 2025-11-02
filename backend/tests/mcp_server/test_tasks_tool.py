@@ -58,25 +58,12 @@ class TestGetBestTaskTool:
         mock_response.json.return_value = mock_api_response
         mock_response.raise_for_status = MagicMock()
 
-        with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class, \
-             patch("mcp_server.tools.tasks.embed_component") as mock_embed:
+        with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.request = AsyncMock(return_value=mock_response)
+            mock_client.get = AsyncMock(return_value=mock_response)
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = AsyncMock()
             mock_client_class.return_value = mock_client
-
-            # Mock embed_component to add _meta field
-            def add_meta(data, **kwargs):
-                return {
-                    **data,
-                    "_meta": {
-                        "openai/outputTemplate": "// Mock component code",
-                        "openai/displayMode": kwargs.get("display_mode", "inline"),
-                        "openai/widgetId": f"task-{data['task']['id']}",
-                    }
-                }
-            mock_embed.side_effect = add_meta
 
             # Call the tool
             result = await get_best_task(f"Bearer {valid_token}")
@@ -89,7 +76,7 @@ class TestGetBestTaskTool:
             assert result["score"] == 8.5
             assert result["reasoning"]["recommendation"] == "High priority task worth focusing on"
 
-            # Assertions - ChatGPT Apps SDK _meta field
+            # Assertions - ChatGPT Apps SDK _meta field (added by renderer)
             assert "_meta" in result
             assert "openai/outputTemplate" in result["_meta"]
             assert "openai/displayMode" in result["_meta"]
@@ -98,41 +85,31 @@ class TestGetBestTaskTool:
             assert result["_meta"]["openai/widgetId"] == "task-550e8400-e29b-41d4-a716-446655440000"
 
             # Verify API was called correctly
-            mock_client.request.assert_called_once()
-            call_args = mock_client.request.call_args
-            assert call_args[1]["method"] == "GET"
-            assert "/api/tasks/best" in call_args[1]["url"]
+            mock_client.get.assert_called_once()
+            call_args = mock_client.get.call_args
+            assert "/api/tasks/best" in call_args[0][0]
             assert "Authorization" in call_args[1]["headers"]
             assert call_args[1]["headers"]["Authorization"] == f"Bearer {valid_token}"
-
-            # Verify embed_component was called
-            mock_embed.assert_called_once()
-            embed_args = mock_embed.call_args
-            assert embed_args[1]["component_name"] == "taskcard"
-            assert embed_args[1]["display_mode"] == "inline"
 
     @pytest.mark.asyncio
     async def test_get_best_task_no_pending_tasks(self, valid_token):
         """Test get_best_task when no pending tasks exist."""
-        # Simplify: Make request itself raise the error
+        # Create response mock
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.json = MagicMock(return_value={"detail": "No pending tasks"})
+
+        # Create error
         mock_error = httpx.HTTPStatusError(
             "404 Not Found",
             request=MagicMock(),
-            response=MagicMock(status_code=404, json=MagicMock(return_value={"detail": "No pending tasks"})),
+            response=mock_response,
         )
+        mock_response.raise_for_status = MagicMock(side_effect=mock_error)
 
         with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-
-            # Create response that raises on raise_for_status
-            async def mock_request(*args, **kwargs):
-                response = MagicMock()
-                response.status_code = 404
-                response.json = MagicMock(return_value={"detail": "No pending tasks"})
-                response.raise_for_status.side_effect = mock_error
-                return response
-
-            mock_client.request = mock_request
+            mock_client.get = AsyncMock(return_value=mock_response)
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = AsyncMock()
             mock_client_class.return_value = mock_client
@@ -164,7 +141,7 @@ class TestGetBestTaskTool:
         # Mock network error then success
         error_count = 0
 
-        async def mock_request_side_effect(*args, **kwargs):
+        async def mock_get_side_effect(*args, **kwargs):
             nonlocal error_count
             if error_count == 0:
                 error_count += 1
@@ -189,7 +166,7 @@ class TestGetBestTaskTool:
 
         with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.request = AsyncMock(side_effect=mock_request_side_effect)
+            mock_client.get = AsyncMock(side_effect=mock_get_side_effect)
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = AsyncMock()
             mock_client_class.return_value = mock_client
@@ -201,29 +178,27 @@ class TestGetBestTaskTool:
                 assert result["task"]["title"] == "Test task"
 
                 # Verify retry happened
-                assert mock_client.request.call_count == 2
+                assert mock_client.get.call_count == 2
 
     @pytest.mark.asyncio
     async def test_get_best_task_unauthorized_401(self, valid_token):
         """Test get_best_task with API returning 401 Unauthorized."""
+        # Create response mock
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.json = MagicMock(return_value={"detail": "Invalid authentication credentials"})
+
+        # Create error
         mock_error = httpx.HTTPStatusError(
             "401 Unauthorized",
             request=MagicMock(),
-            response=MagicMock(status_code=401, json=MagicMock(return_value={"detail": "Invalid authentication credentials"})),
+            response=mock_response,
         )
+        mock_response.raise_for_status = MagicMock(side_effect=mock_error)
 
         with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-
-            # Create response that raises on raise_for_status
-            async def mock_request(*args, **kwargs):
-                response = MagicMock()
-                response.status_code = 401
-                response.json = MagicMock(return_value={"detail": "Invalid authentication credentials"})
-                response.raise_for_status.side_effect = mock_error
-                return response
-
-            mock_client.request = mock_request
+            mock_client.get = AsyncMock(return_value=mock_response)
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = AsyncMock()
             mock_client_class.return_value = mock_client
@@ -245,7 +220,7 @@ class TestGetBestTaskTool:
 
         with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.request = AsyncMock(return_value=mock_response)
+            mock_client.get = AsyncMock(return_value=mock_response)
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = AsyncMock()
             mock_client_class.return_value = mock_client
@@ -253,7 +228,7 @@ class TestGetBestTaskTool:
             await get_best_task(f"Bearer {valid_token}")
 
             # Verify correct URL construction
-            call_args = mock_client.request.call_args
-            url = call_args[1]["url"]
+            call_args = mock_client.get.call_args
+            url = call_args[0][0]
             assert url.startswith("http://localhost:8000") or url.startswith("http://")
             assert "/api/tasks/best" in url

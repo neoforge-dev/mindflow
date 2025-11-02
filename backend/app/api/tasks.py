@@ -1,6 +1,6 @@
 """Task API endpoints - route order is critical!"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -206,3 +206,45 @@ async def delete_task(
         )
     await TaskCRUD.delete(db, task_id, user_id)
     return None  # 204 No Content
+
+
+@router.post("/api/tasks/{task_id}/complete", response_model=TaskResponse)
+@limiter.limit("60/minute")
+async def complete_task(
+    request: Request,  # noqa: ARG001
+    task_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark task as complete."""
+    data = {
+        "status": "completed",
+        "completed_at": datetime.utcnow(),
+    }
+    try:
+        task = await TaskCRUD.update(db, task_id, user_id, data)
+        return task
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.post("/api/tasks/{task_id}/snooze", response_model=TaskResponse)
+@limiter.limit("60/minute")
+async def snooze_task(
+    request: Request,  # noqa: ARG001
+    task_id: UUID,
+    hours: int = 3,  # Default 3 hours
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Snooze task for specified hours."""
+    snooze_until = datetime.utcnow() + timedelta(hours=hours)
+    data = {
+        "snoozed_until": snooze_until,
+        "status": "snoozed",
+    }
+    try:
+        task = await TaskCRUD.update(db, task_id, user_id, data)
+        return task
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
