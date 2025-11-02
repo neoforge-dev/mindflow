@@ -10,46 +10,49 @@
  * - No external CSS frameworks
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TaskCardProps } from '../types/Task';
 import { formatDueDate, formatEffort, isOverdue } from '../utils/dateFormat';
 import { getPriorityColors } from '../utils/priorityColors';
-
-/**
- * Detect if user prefers dark mode
- */
-function useIsDarkMode(): boolean {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
-
-  return isDark;
-}
+import { useOpenAI } from '../hooks/useOpenAI';
 
 /**
  * TaskCard component
+ *
+ * When running in ChatGPT:
+ * - Gets task data from window.openai.toolOutput
+ * - Uses ChatGPT's theme preference
+ *
+ * When running standalone:
+ * - Uses props directly
+ * - Falls back to system theme preference
  */
 export const TaskCard: React.FC<TaskCardProps> = ({
-  task,
-  score,
-  reasoning,
+  task: propTask,
+  score: propScore,
+  reasoning: propReasoning,
   onTaskClick,
   className = '',
 }) => {
-  const isDark = useIsDarkMode();
+  // Use OpenAI hook for ChatGPT integration
+  const { theme, toolOutput } = useOpenAI();
+  const isDark = theme === 'dark';
+
+  // Get task data from toolOutput (ChatGPT) or props (standalone)
+  const taskData = toolOutput?.output || { task: propTask, score: propScore, reasoning: propReasoning };
+  const task = taskData.task || propTask;
+  const score = taskData.score ?? propScore;
+  const reasoning = taskData.reasoning || propReasoning;
+
+  // Early return if no task data
+  if (!task) {
+    return (
+      <div style={{ padding: '16px', color: isDark ? '#ffffff' : '#000000' }}>
+        No task data available
+      </div>
+    );
+  }
+
   const priorityColors = getPriorityColors(task.priority, isDark);
   const dueDateText = formatDueDate(task.due_date);
   const effortText = formatEffort(task.effort_estimate_minutes);

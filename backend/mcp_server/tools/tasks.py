@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from mcp_server.auth import verify_bearer_token
+from mcp_server.component_loader import embed_component
 from mcp_server.config import config
 
 
@@ -58,7 +59,14 @@ async def get_best_task(authorization: str) -> dict[str, Any]:
         headers=headers,
     )
 
-    return result
+    # Embed React component for ChatGPT Apps SDK
+    # This adds the _meta field with the compiled TaskCard component
+    return embed_component(
+        data=result,
+        component_name="taskcard",
+        display_mode="inline",
+        # widget_id auto-generated from task.id
+    )
 
 
 async def _call_api_with_retry(

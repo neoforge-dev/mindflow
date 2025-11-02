@@ -58,23 +58,44 @@ class TestGetBestTaskTool:
         mock_response.json.return_value = mock_api_response
         mock_response.raise_for_status = MagicMock()
 
-        with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class:
+        with patch("mcp_server.tools.tasks.httpx.AsyncClient") as mock_client_class, \
+             patch("mcp_server.tools.tasks.embed_component") as mock_embed:
             mock_client = AsyncMock()
             mock_client.request = AsyncMock(return_value=mock_response)
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = AsyncMock()
             mock_client_class.return_value = mock_client
 
+            # Mock embed_component to add _meta field
+            def add_meta(data, **kwargs):
+                return {
+                    **data,
+                    "_meta": {
+                        "openai/outputTemplate": "// Mock component code",
+                        "openai/displayMode": kwargs.get("display_mode", "inline"),
+                        "openai/widgetId": f"task-{data['task']['id']}",
+                    }
+                }
+            mock_embed.side_effect = add_meta
+
             # Call the tool
             result = await get_best_task(f"Bearer {valid_token}")
 
-            # Assertions
+            # Assertions - original data
             assert "task" in result
             assert "score" in result
             assert "reasoning" in result
             assert result["task"]["title"] == "Complete project documentation"
             assert result["score"] == 8.5
             assert result["reasoning"]["recommendation"] == "High priority task worth focusing on"
+
+            # Assertions - ChatGPT Apps SDK _meta field
+            assert "_meta" in result
+            assert "openai/outputTemplate" in result["_meta"]
+            assert "openai/displayMode" in result["_meta"]
+            assert "openai/widgetId" in result["_meta"]
+            assert result["_meta"]["openai/displayMode"] == "inline"
+            assert result["_meta"]["openai/widgetId"] == "task-550e8400-e29b-41d4-a716-446655440000"
 
             # Verify API was called correctly
             mock_client.request.assert_called_once()
@@ -83,6 +104,12 @@ class TestGetBestTaskTool:
             assert "/api/tasks/best" in call_args[1]["url"]
             assert "Authorization" in call_args[1]["headers"]
             assert call_args[1]["headers"]["Authorization"] == f"Bearer {valid_token}"
+
+            # Verify embed_component was called
+            mock_embed.assert_called_once()
+            embed_args = mock_embed.call_args
+            assert embed_args[1]["component_name"] == "taskcard"
+            assert embed_args[1]["display_mode"] == "inline"
 
     @pytest.mark.asyncio
     async def test_get_best_task_no_pending_tasks(self, valid_token):
