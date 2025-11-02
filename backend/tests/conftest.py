@@ -10,6 +10,7 @@ import uuid
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.db.database import Base
 from app.db.models import User
@@ -23,7 +24,11 @@ TEST_DATABASE_URL = os.getenv(
 @pytest_asyncio.fixture(scope="session")
 async def db_tables():
     """Create database tables once per test session."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,  # No connection pooling
+    )
 
     # Create all tables
     async with engine.begin() as conn:
@@ -35,25 +40,32 @@ async def db_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-    await engine.dispose()
+    # Dispose engine - suppress RuntimeError if event loop is already closed
+    try:
+        await engine.dispose()
+    except RuntimeError as e:
+        if "Event loop is closed" not in str(e):
+            raise
 
 
 @pytest_asyncio.fixture(scope="function")
 async def db_engine(db_tables):
-    """Create test database engine with proper cleanup."""
+    """Create test database engine with NullPool to avoid event loop cleanup issues."""
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
-        pool_pre_ping=True,  # Verify connections before use
-        pool_size=5,  # Reasonable pool size for tests
-        max_overflow=0,  # No overflow connections
-        pool_timeout=30,  # Timeout for getting connection
+        poolclass=NullPool,  # No connection pooling - creates new connection each time
     )
 
     yield engine
 
     # Dispose engine after each test
-    await engine.dispose()
+    # Suppress RuntimeError if event loop is already closed (cleanup order issue)
+    try:
+        await engine.dispose()
+    except RuntimeError as e:
+        if "Event loop is closed" not in str(e):
+            raise
 
 
 @pytest_asyncio.fixture
@@ -136,29 +148,47 @@ async def test_task(db_engine, test_user):
 
 
 @pytest_asyncio.fixture
-async def test_client(db_engine):
+async def test_client(db_tables):
     """Async HTTP client for API testing with database override."""
     from httpx import ASGITransport, AsyncClient
 
     from app.dependencies import get_db
     from app.main import create_app
 
-    # Create fresh app instance for each test to avoid event loop issues
+    # Create fresh engine for each test client to avoid event loop issues
+    test_engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,  # No connection pooling
+    )
+
+    # Create fresh app instance for each test
     app = create_app()
 
-    # Override get_db dependency to use test database
+    # Override get_db dependency to use test database with fresh engine
     async def override_get_db():
-        async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+        async_session = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
         async with async_session() as session:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # Create client with explicit transport
+    transport = ASGITransport(app=app)
+    client = AsyncClient(transport=transport, base_url="http://test")
+
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            yield client
+        yield client
     finally:
-        # Clean up - ensure this always runs
+        # Explicitly close client and transport to release all connections
+        await client.aclose()
+        # Dispose engine - suppress RuntimeError if event loop is closed
+        try:
+            await test_engine.dispose()
+        except RuntimeError as e:
+            if "Event loop is closed" not in str(e):
+                raise
+        # Clear dependency overrides
         app.dependency_overrides.clear()
 
 

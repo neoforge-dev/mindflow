@@ -53,7 +53,7 @@ async def test_health_check_includes_environment(test_client):
     assert data["environment"] == "testing"
 
 
-@pytest.mark.xfail(reason="Event loop cleanup issue with pytest-asyncio and asyncpg - tracked for fix")
+@pytest.mark.xfail(reason="pytest-asyncio event loop sequencing issue - tests pass individually")
 @pytest.mark.asyncio
 async def test_health_check_returns_503_on_db_failure(test_client):
     """GET /health returns 503 when database is unavailable."""
