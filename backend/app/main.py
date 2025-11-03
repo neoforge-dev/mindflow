@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
         description="AI-first task manager API",
         version="2.0.0",
         docs_url="/docs",
+        root_path="/api",
         redoc_url="/redoc",
         debug=settings.debug,
     )

@@ -1,0 +1,37 @@
+# IP-based access (frontend + API)
+:80 {
+    # Serve API on /api path
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy api:8000
+        encode gzip
+    }
+
+    # Serve frontend static files
+    handle {
+        root * /srv/frontend
+        try_files {path} /index.html
+        file_server
+        encode gzip
+    }
+}
+
+# Domain-based access (for production with SSL)
+api.yourdomain.com {
+    reverse_proxy api:8000
+    encode gzip
+
+    # CORS headers
+    header {
+        Access-Control-Allow-Origin https://yourdomain.com
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Authorization, Content-Type"
+    }
+}
+
+yourdomain.com {
+    root * /srv/frontend
+    try_files {path} /index.html
+    file_server
+    encode gzip
+}
