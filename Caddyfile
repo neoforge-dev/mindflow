@@ -17,19 +17,19 @@
 }
 
 # Domain-based access (for production with SSL)
-api.yourdomain.com {
+api.mindflow.neoforge.dev {
     reverse_proxy api:8000
     encode gzip
 
     # CORS headers
     header {
-        Access-Control-Allow-Origin https://yourdomain.com
+        Access-Control-Allow-Origin https://mindflow.neoforge.dev
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
         Access-Control-Allow-Headers "Authorization, Content-Type"
     }
 }
 
-yourdomain.com {
+mindflow.neoforge.dev {
     root * /srv/frontend
     try_files {path} /index.html
     file_server
