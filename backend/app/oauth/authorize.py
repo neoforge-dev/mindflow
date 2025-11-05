@@ -6,7 +6,6 @@ Implements RFC 6749 (OAuth 2.0) Section 4.1 Authorization Code Grant with:
 - Comprehensive error handling per RFC 6749 Section 4.1.2.1
 """
 
-import secrets
 from typing import Annotated
 from urllib.parse import urlencode
 
@@ -18,15 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import User
 from app.dependencies import get_db
 from app.oauth.crud import OAuthAuthorizationCodeCRUD, OAuthClientCRUD
+from app.oauth.csrf import CSRFTokenStorage
 from app.oauth.schemas import AuthorizationRequest
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory="app/oauth/templates")
-
-# In-memory CSRF token storage (for production, use Redis or encrypted session cookies)
-csrf_tokens: dict[str, dict[str, str]] = {}
 
 
 def get_optional_user(request: Request) -> User | None:
@@ -159,17 +156,18 @@ async def authorize_get(
         login_url = f"/api/auth/login?return_to={request.url}"
         return RedirectResponse(url=login_url, status_code=status.HTTP_303_SEE_OTHER)
 
-    # Generate CSRF token for consent form
-    csrf_token = secrets.token_urlsafe(32)
-    csrf_tokens[csrf_token] = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": scope,
-        "state": state,
-        "code_challenge": code_challenge,
-        "code_challenge_method": code_challenge_method,
-        "user_id": str(current_user.id),
-    }
+    # Generate CSRF token for consent form (Redis-backed, works across workers)
+    csrf_token = await CSRFTokenStorage.generate_token(
+        {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": scope,
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": code_challenge_method,
+            "user_id": str(current_user.id),
+        }
+    )
 
     # Display consent screen
     return templates.TemplateResponse(
@@ -210,8 +208,8 @@ async def authorize_post(
 
     RFC 6749 Section 4.1.2: Authorization Response
     """
-    # Validate CSRF token
-    csrf_data = csrf_tokens.pop(csrf_token, None)
+    # Validate CSRF token (Redis-backed, one-time use)
+    csrf_data = await CSRFTokenStorage.validate_and_consume(csrf_token)
     if not csrf_data:
         return _redirect_error(
             redirect_uri, "access_denied", "Invalid or expired CSRF token", state

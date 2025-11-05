@@ -1,6 +1,6 @@
 """Rate limiting middleware using slowapi.
 
-Implements in-memory rate limiting for API endpoints:
+Implements Redis-backed rate limiting for API endpoints:
 - Task endpoints: 60 requests per minute
 - Auth endpoints: 10 requests per minute
 - Disabled in testing environment
@@ -39,13 +39,18 @@ def get_remote_address_safe(request: Request) -> str:
 
 
 # Create global limiter instance
-# Disable rate limiting in testing environment to avoid test interference
+# Uses Redis for shared state across multiple workers/servers
+# Falls back to memory:// in testing environment
 _is_testing = os.getenv("ENVIRONMENT") == "testing"
+_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+_storage_uri = "memory://" if _is_testing else _redis_url
+
 limiter = Limiter(
     key_func=get_remote_address_safe,
     default_limits=["100/minute"],
-    storage_uri="memory://",  # In-memory storage (no Redis)
+    storage_uri=_storage_uri,
     enabled=not _is_testing,  # Disable completely in testing
+    strategy="fixed-window",
 )
 
 
