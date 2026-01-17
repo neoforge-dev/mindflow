@@ -20,8 +20,8 @@ def calculate_deadline_urgency(due_date: datetime | None) -> float:
         due_date: Task deadline or None
 
     Returns:
-        Urgency multiplier: 0.0-1.25
-            - 1.25: Overdue (past due date)
+        Urgency multiplier: 0.0-2.0
+            - 2.0: Overdue (past due date) - ensures score >= 90
             - 1.0: Due today
             - 0.75: Due tomorrow
             - 0.5: Due within a week
@@ -37,7 +37,7 @@ def calculate_deadline_urgency(due_date: datetime | None) -> float:
     hours_until = seconds_until / 3600
 
     if hours_until < 0:
-        return 1.25  # Overdue - highest urgency
+        return 2.0  # Overdue - highest urgency (ensures score >= 90 with priority >= 3)
     if hours_until < 24:
         return 1.0  # Due today (within 24 hours)
     if hours_until < 48:

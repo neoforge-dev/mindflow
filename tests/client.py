@@ -65,7 +65,9 @@ class MindFlowClient:
             APIResponse with created task data
 
         Raises:
-            requests.RequestException: On network error
+            requests.RequestException: On network error or validation error (422)
+            requests.HTTPError: On 404 or other HTTP errors
+            ValueError: On API error responses (status="error" in body)
         """
         response = self.session.post(
             f"{self.base_url}?action=create",
@@ -73,8 +75,21 @@ class MindFlowClient:
             headers={"Content-Type": "application/json"},
             timeout=self.timeout,
         )
-        response.raise_for_status()
-        return APIResponse(**response.json())
+        # Raise exception for HTTP errors (4xx, 5xx)
+        if response.status_code >= 400:
+            response.raise_for_status()
+        
+        # Check response body for API-level errors (Google Apps Script returns 200 with error in body)
+        response_data = response.json()
+        if isinstance(response_data, dict) and response_data.get("status") == "error":
+            error_msg = response_data.get("data", {}).get("message", "API error")
+            errors = response_data.get("data", {}).get("errors", [])
+            if errors:
+                error_details = "; ".join([f"{e.get('field', 'unknown')}: {e.get('issue', 'error')}" for e in errors])
+                raise ValueError(f"Validation error: {error_details}")
+            raise ValueError(f"API error: {error_msg}")
+        
+        return APIResponse(**response_data)
 
     def get_best_task(self, timezone: str = "UTC") -> APIResponse:
         """
@@ -102,6 +117,10 @@ class MindFlowClient:
 
         Returns:
             APIResponse with success confirmation
+
+        Raises:
+            requests.HTTPError: On 404 (task not found) or validation error (422)
+            ValueError: On API error responses
         """
         response = self.session.post(
             f"{self.base_url}?action=update&id={task_id}",
@@ -109,8 +128,17 @@ class MindFlowClient:
             headers={"Content-Type": "application/json"},
             timeout=self.timeout,
         )
-        response.raise_for_status()
-        return APIResponse(**response.json())
+        # Raise exception for HTTP errors (4xx, 5xx)
+        if response.status_code >= 400:
+            response.raise_for_status()
+        
+        # Check response body for API-level errors
+        response_data = response.json()
+        if isinstance(response_data, dict) and response_data.get("status") == "error":
+            error_msg = response_data.get("data", {}).get("message", "API error")
+            raise ValueError(f"API error: {error_msg}")
+        
+        return APIResponse(**response_data)
 
     def complete_task(self, task_id: str) -> APIResponse:
         """
@@ -121,6 +149,10 @@ class MindFlowClient:
 
         Returns:
             APIResponse with success confirmation
+
+        Raises:
+            requests.HTTPError: On 404 (task not found)
+            ValueError: On API error responses
         """
         response = self.session.post(
             f"{self.base_url}?action=complete&id={task_id}",
@@ -128,8 +160,17 @@ class MindFlowClient:
             headers={"Content-Type": "application/json"},
             timeout=self.timeout,
         )
-        response.raise_for_status()
-        return APIResponse(**response.json())
+        # Raise exception for HTTP errors (4xx, 5xx)
+        if response.status_code >= 400:
+            response.raise_for_status()
+        
+        # Check response body for API-level errors
+        response_data = response.json()
+        if isinstance(response_data, dict) and response_data.get("status") == "error":
+            error_msg = response_data.get("data", {}).get("message", "API error")
+            raise ValueError(f"API error: {error_msg}")
+        
+        return APIResponse(**response_data)
 
     def snooze_task(self, task_id: str, duration: str = "2h") -> APIResponse:
         """
@@ -141,6 +182,10 @@ class MindFlowClient:
 
         Returns:
             APIResponse with snoozed_until timestamp
+
+        Raises:
+            requests.HTTPError: On 404 (task not found)
+            ValueError: On API error responses
         """
         response = self.session.post(
             f"{self.base_url}?action=snooze&id={task_id}",
@@ -148,8 +193,17 @@ class MindFlowClient:
             headers={"Content-Type": "application/json"},
             timeout=self.timeout,
         )
-        response.raise_for_status()
-        return APIResponse(**response.json())
+        # Raise exception for HTTP errors (4xx, 5xx)
+        if response.status_code >= 400:
+            response.raise_for_status()
+        
+        # Check response body for API-level errors
+        response_data = response.json()
+        if isinstance(response_data, dict) and response_data.get("status") == "error":
+            error_msg = response_data.get("data", {}).get("message", "API error")
+            raise ValueError(f"API error: {error_msg}")
+        
+        return APIResponse(**response_data)
 
     def query_tasks(
         self,

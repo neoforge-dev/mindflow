@@ -12,7 +12,7 @@ class TaskBase(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=200)
     description: str | None = Field(None, max_length=2000)
-    priority: int = Field(default=3, ge=1, le=5)
+    priority: int = Field(..., ge=1, le=5)  # Required field, no default
     due_date: datetime | None = None
     tags: str | None = Field(None, max_length=500)
     effort_estimate_minutes: int | None = Field(None, ge=1, le=480)  # Max 8 hours
