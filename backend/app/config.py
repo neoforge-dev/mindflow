@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Monitoring
     sentry_dsn: str | None = os.getenv("SENTRY_DSN", None)
 
+    # Analytics (PostHog)
+    posthog_api_key: str | None = os.getenv("POSTHOG_API_KEY", None)
+    posthog_host: str = os.getenv("POSTHOG_HOST", "https://eu.posthog.com")
+
     model_config = ConfigDict(
         env_file=".env",
         extra="ignore",  # Ignore extra fields from .env

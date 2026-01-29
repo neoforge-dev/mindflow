@@ -33,7 +33,12 @@ dependencies = [
     "httpx>=0.28.1",
     "redis>=5.0.0",
     "hiredis>=2.3.0",
+    "forge-shared>=0.1.0",
+    "posthog>=3.0.0",
 ]
+
+[tool.uv.sources]
+forge-shared = { path = "../../../forge-shared", editable = true }
 
 [project.optional-dependencies]
 dev = [

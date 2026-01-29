@@ -99,3 +99,4 @@ temp/
 # OS generated files
 Thumbs.db
 ehthumbs.db
+quality_metrics/

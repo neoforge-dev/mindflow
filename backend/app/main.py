@@ -7,11 +7,17 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.logging_config import configure_logging, get_logger
 from app.middleware.rate_limit import setup_rate_limiting
-from app.middleware.request_logging import RequestIDMiddleware
+from forge_shared.middleware import RequestIDMiddleware, SecurityMiddleware
+from forge_shared.utm import UTMMiddleware, get_utm_params
+from forge_shared.health import create_health_router
 from app.monitoring import init_sentry
+from app.services.posthog_analytics import PostHogAnalytics
 
 # Initialize Sentry error monitoring (if configured)
 init_sentry(settings)
+
+# Initialize PostHog analytics
+PostHogAnalytics.initialize()
 
 # Setup structured logging
 configure_logging()
@@ -86,7 +92,14 @@ def create_app() -> FastAPI:
 
     # Setup request ID and logging middleware (skip in testing to avoid event loop issues)
     if not settings.is_testing:
+        # UTM middleware for attribution tracking
+        app.add_middleware(UTMMiddleware)
         app.add_middleware(RequestIDMiddleware)
+        app.add_middleware(
+            SecurityMiddleware,
+            hsts_max_age=31536000,
+            csp_enabled=False,  # Disable CSP for ChatGPT widget compatibility
+        )
 
     # Setup rate limiting (automatically disabled in testing via environment check)
     setup_rate_limiting(app)
@@ -102,6 +115,9 @@ def create_app() -> FastAPI:
     from app.oauth.token import router as oauth_token_router
 
     app.include_router(auth_router)
+    app.include_router(
+        create_health_router(name="mindflow", version="2.0.0"),
+    )
     app.include_router(health_router)
     app.include_router(tasks_router)
     app.include_router(oauth_discovery_router)
